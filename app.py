@@ -23,7 +23,7 @@ def home():
 # Health check route
 @app.route('/healthz', methods=['GET'])
 def health_check():
-    if request.data:
+    if request.content_length and request.content_length > 0:
         return jsonify({'error': 'Bad Request'}), 400
     
     try:
