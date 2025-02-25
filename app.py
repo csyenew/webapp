@@ -36,7 +36,7 @@ def health_check():
         db.session.add(health_check)
         db.session.commit()
         
-        return jsonify({'status': 'healthy'}), 200  # Include content in the response
+        return jsonify({'status': 'healthy'}), 20  # Include content in the response
     except Exception as e:
         print(f"Error: {e}")
         return jsonify({'error': 'Service Unavailable'}), 503
