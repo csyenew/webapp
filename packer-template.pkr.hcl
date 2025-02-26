@@ -99,27 +99,26 @@ build {
       "echo 'Installing Flask dependencies...'",
       "sudo -u csye6225 /home/csye6225/webapp/venv/bin/pip install Flask Flask-SQLAlchemy Flask-Migrate python-dotenv mysql-connector-python werkzeug pytest",
 
-      # Create systemd service file
+      # Create systemd service file using heredoc
       "echo 'Creating systemd service file...'",
-      "cat <<EOF | sudo tee /etc/systemd/system/webapp.service
-[Unit]
-Description=Flask Web Application
-After=network.target
-
-[Service]
-User=csye6225
-Group=csye6225
-WorkingDirectory=/home/csye6225/webapp
-ExecStart=/home/csye6225/webapp/venv/bin/python /home/csye6225/webapp/app.py
-Restart=always
-Environment=FLASK_APP=app.py
-Environment=FLASK_ENV=production
-Environment=PATH=/home/csye6225/webapp/venv/bin:$PATH
-
-[Install]
-WantedBy=multi-user.target
-EOF
-",
+      "cat <<EOF | sudo tee /etc/systemd/system/webapp.service",
+      "[Unit]",
+      "Description=Flask Web Application",
+      "After=network.target",
+      "",
+      "[Service]",
+      "User=csye6225",
+      "Group=csye6225",
+      "WorkingDirectory=/home/csye6225/webapp",
+      "ExecStart=/home/csye6225/webapp/venv/bin/python /home/csye6225/webapp/app.py",
+      "Restart=always",
+      "Environment=FLASK_APP=app.py",
+      "Environment=FLASK_ENV=production",
+      "Environment=PATH=/home/csye6225/webapp/venv/bin:$PATH",
+      "",
+      "[Install]",
+      "WantedBy=multi-user.target",
+      "EOF",
 
       # Reload systemd and enable service
       "echo 'Reloading systemd daemon...'",
