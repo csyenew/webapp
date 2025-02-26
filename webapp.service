@@ -1,0 +1,16 @@
+[Unit]
+Description=Flask Web Application
+After=network.target
+
+[Service]
+User=csye6225
+Group=csye6225
+WorkingDirectory=/home/csye6225/webapp
+ExecStart=/usr/bin/python3 /home/csye6225/webapp/app.py
+Restart=always
+Environment="FLASK_APP=app.py"
+Environment="FLASK_ENV=production"
+Environment="PATH=/home/csye6225/webapp/venv/bin:$PATH"
+
+[Install]
+WantedBy=multi-user.target
