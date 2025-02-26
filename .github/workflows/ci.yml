@@ -4,7 +4,7 @@ on:
   pull_request:
     branches: [main]
 
-jobs:
+jobs: 
   test:
     runs-on: ubuntu-latest
 
@@ -55,18 +55,18 @@ jobs:
 
       - name: Initialize Migrations (if not present)
         run: |
+          source venv/bin/activate  # Ensure virtual environment is activated
           if [ ! -d "migrations" ]; then
             flask db init
           fi
 
       - name: Run Database Migrations
         run: |
-          source venv/bin/activate
+          source venv/bin/activate  # Ensure virtual environment is activated
           flask db migrate -m "Initial migration" || true  # Allow failure if no changes
           flask db upgrade
 
       - name: Run Tests
         run: |
-          source venv/bin/activate
+          source venv/bin/activate  # Ensure virtual environment is activated
           pytest
- 
