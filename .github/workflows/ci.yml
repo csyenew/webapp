@@ -12,9 +12,9 @@ jobs:
       mysql:
         image: mysql:8.0
         env:
-          MYSQL_ROOT_PASSWORD: rootpassword
-          MYSQL_DATABASE: csye6225
-          MYSQL_USER: appuser
+          MYSQL_ROOT_PASSWORD: ds220401
+          MYSQL_DATABASE: ds
+          MYSQL_USER: root
           MYSQL_PASSWORD: ds220401
         ports:
           - 3306:3306
@@ -41,12 +41,24 @@ jobs:
 
       - name: Set Environment Variables
         run: |
-          echo "SQLALCHEMY_DATABASE_URI=mysql+mysqlconnector://appuser:AppPassword123!@127.0.0.1:3306/csye6225" >> $GITHUB_ENV
+          echo "SQLALCHEMY_DATABASE_URI=mysql+mysqlconnector://root:ds220401@127.0.0.1:3306/ds" >> $GITHUB_ENV
 
       - name: Run Database Migrations
         run: |
           source venv/bin/activate
           flask db upgrade
+
+      - name: Wait for MySQL to be Ready
+        run: |
+          echo "Waiting for MySQL to start..."
+          for i in {1..30}; do
+            if mysqladmin ping -h 127.0.0.1 --silent; then
+              echo "MySQL is up!"
+              break
+            fi
+            echo "MySQL is unavailable - sleeping"
+            sleep 2
+          done
 
       - name: Run Tests
         run: |
