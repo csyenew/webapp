@@ -37,6 +37,18 @@ jobs:
           source venv/bin/activate
           pip install -r requirements.txt
 
+      - name: Wait for MySQL to be Ready
+        run: |
+          echo "Waiting for MySQL to start..."
+          for i in {1..30}; do
+            if mysqladmin ping -h 127.0.0.1 --silent; then
+              echo "MySQL is up!"
+              break
+            fi
+            echo "MySQL is unavailable - sleeping"
+            sleep 2
+          done
+
       - name: Set Environment Variables
         run: |
           echo "SQLALCHEMY_DATABASE_URI=mysql+mysqlconnector://root:ds220401@127.0.0.1:3306/ds" >> $GITHUB_ENV
