@@ -13,7 +13,7 @@ jobs:
         image: mysql:8.0
         env:
           MYSQL_ROOT_PASSWORD: rootpassword
-          MYSQL_DATABASE: csye6225
+          MYSQL_DATABASE: ds  # Updated database name to 'ds'
           MYSQL_USER: appuser
           MYSQL_PASSWORD: ds220401
         ports:
@@ -39,16 +39,19 @@ jobs:
           source venv/bin/activate
           pip install -r requirements.txt
 
+      # Set environment variable for SQLAlchemy with the correct database name
       - name: Set Environment Variables
         run: |
-          echo "SQLALCHEMY_DATABASE_URI=mysql+mysqlconnector://appuser:AppPassword123!@127.0.0.1:3306/csye6225" >> $GITHUB_ENV
+          echo "SQLALCHEMY_DATABASE_URI=mysql+mysqlconnector://appuser:ds220401@127.0.0.1:3306/ds" >> $GITHUB_ENV  # Updated database name to 'ds'
 
+      # Run database migrations (e.g., for Flask-Migrate)
       - name: Run Database Migrations
         run: |
           source venv/bin/activate
           flask db upgrade
 
+      # Run tests using pytest
       - name: Run Tests
         run: |
           source venv/bin/activate
-          pytest
+          pytest  # You may adjust the pytest command if needed, e.g., specifying paths or configurations
