@@ -4,7 +4,7 @@ on:
   pull_request:
     branches: [main]
 
-jobs: 
+jobs:
   test:
     runs-on: ubuntu-latest
 
@@ -33,9 +33,17 @@ jobs:
 
       - name: Install Dependencies
         run: |
+          # Create virtual environment
           python -m venv venv
+          
+          # Activate virtual environment
           source venv/bin/activate
+          
+          # Install all dependencies including pytest
           pip install -r requirements.txt
+          
+          # Ensure flask and pytest are installed explicitly
+          pip install flask pytest
 
       - name: Wait for MySQL to be Ready
         run: |
@@ -69,4 +77,5 @@ jobs:
       - name: Run Tests
         run: |
           source venv/bin/activate  # Ensure virtual environment is activated
-          pytest
+          pytest  # Run tests with pytest
+ 
