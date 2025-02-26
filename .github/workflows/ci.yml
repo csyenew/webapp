@@ -21,7 +21,7 @@ jobs:
           --health-interval=10s
           --health-timeout=5s
           --health-retries=3
-
+ 
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -39,11 +39,9 @@ jobs:
           # Activate virtual environment
           source venv/bin/activate
           
-          # Install all dependencies including pytest
+          # Install dependencies including flask and pytest
           pip install -r requirements.txt
-          
-          # Ensure flask and pytest are installed explicitly
-          pip install flask pytest
+          pip install flask pytest  # Ensure both flask and pytest are installed
 
       - name: Wait for MySQL to be Ready
         run: |
@@ -78,4 +76,3 @@ jobs:
         run: |
           source venv/bin/activate  # Ensure virtual environment is activated
           pytest  # Run tests with pytest
- 
