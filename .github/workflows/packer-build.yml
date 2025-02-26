@@ -41,7 +41,7 @@ jobs:
           pip install -r requirements.txt  # Ensure this file exists
 
       - name: Test with pytest
-        run: pytest --maxfail=1 --disable-warnings -q  # Configure pytest to stop after 1 failure
+        run: pytest tests/ --maxfail=1 --disable-warnings -q  # Ensure the 'tests' directory contains valid test files
 
   check_format:
     runs-on: ubuntu-latest
@@ -52,8 +52,8 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y gnupg software-properties-common
-          sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 93C4A3FD7BB9C367
-          sudo apt-add-repository "deb https://apt.releases.hashicorp.com $(lsb_release -cs) main"
+          curl -fsSL https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
+          echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
           sudo apt-get update
           sudo apt-get install -y packer
           packer --version  # Verify installation
@@ -101,10 +101,11 @@ jobs:
 
       - name: Install AWS CLI
         run: |
-          sudo apt-get update && sudo apt-get install -y unzip curl
+          sudo apt-get update
+          sudo apt-get install -y unzip curl gnupg
           curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
           unzip awscliv2.zip
-          sudo ./aws/install
+          sudo ./aws/install --update
           aws --version  # Verify AWS CLI installation
 
       - name: Get latest AMI ID
@@ -135,11 +136,11 @@ jobs:
       - name: Install AWS CLI
         run: |
           sudo apt-get update
-          sudo apt-get install -y unzip curl
+          sudo apt-get install -y unzip curl gnupg
           curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
           unzip awscliv2.zip
-          sudo ./aws/install
-          aws --version  # Verify installation
+          sudo ./aws/install --update
+          aws --version  # Verify AWS CLI installation
 
       - name: Install GCP CLI
         run: |
