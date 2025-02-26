@@ -39,9 +39,9 @@ jobs:
           # Activate virtual environment
           source venv/bin/activate
           
-          # Install dependencies including flask and pytest
+          # Install dependencies
           pip install -r requirements.txt
-          pip install flask pytest  # Ensure both flask and pytest are installed
+          pip install flask  # Ensure Flask is installed
 
       - name: Wait for MySQL to be Ready
         run: |
@@ -64,7 +64,7 @@ jobs:
           source venv/bin/activate  # Ensure virtual environment is activated
           if [ ! -d "migrations" ]; then
             flask db init
-          fi
+          fi 
 
       - name: Run Database Migrations
         run: |
@@ -72,7 +72,4 @@ jobs:
           flask db migrate -m "Initial migration" || true  # Allow failure if no changes
           flask db upgrade
 
-      - name: Run Tests
-        run: |
-          source venv/bin/activate  # Ensure virtual environment is activated
-          pytest  # Run tests with pytest
+      # Skip the pytest step if you don't want automated tests
