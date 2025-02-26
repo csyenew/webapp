@@ -2,4 +2,5 @@ Flask==2.2.2
 Flask-SQLAlchemy==3.0.2
 Flask-Migrate==3.1.0
 python-dotenv==0.21.0
+mysql-connector-python==8.0.31
 Werkzeug==2.2.2  # Downgrade to 2.2.2 to avoid ImportError
