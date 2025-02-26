@@ -12,7 +12,7 @@ jobs:
       mysql:
         image: mysql:8.0
         env:
-          MYSQL_ROOT_PASSWORD: ds220401
+          MYSQL_ROOT_PASSWORD: rootpassword
           MYSQL_DATABASE: ds
           MYSQL_USER: root
           MYSQL_PASSWORD: ds220401
@@ -22,7 +22,7 @@ jobs:
           --health-cmd="mysqladmin ping -h localhost"
           --health-interval=10s
           --health-timeout=5s
-          --health-retries=3 
+          --health-retries=3
 
     steps:
       - name: Checkout Repository
@@ -47,18 +47,6 @@ jobs:
         run: |
           source venv/bin/activate
           flask db upgrade
-
-      - name: Wait for MySQL to be Ready
-        run: |
-          echo "Waiting for MySQL to start..."
-          for i in {1..30}; do
-            if mysqladmin ping -h 127.0.0.1 --silent; then
-              echo "MySQL is up!"
-              break
-            fi
-            echo "MySQL is unavailable - sleeping"
-            sleep 2
-          done
 
       - name: Run Tests
         run: |
