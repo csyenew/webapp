@@ -57,69 +57,78 @@ source "googlecompute" "ubuntu_custom_gcp" {
 # Build Configuration for AWS and GCP
 build {
   sources = [
-    "source.amazon-ebs.ubuntu_custom_aws",  # Un-commented AWS source
+    "source.amazon-ebs.ubuntu_custom_aws",
     "source.googlecompute.ubuntu_custom_gcp"
   ]
 
-  # Provisioning with shell script for MySQL setup and Flask app deployment
+  # Provisioning with shell script for MySQL setup, Flask app deployment, and systemd service setup
   provisioner "shell" {
-  inline = [
-    "echo 'export DEBIAN_FRONTEND=noninteractive' | sudo tee -a /etc/environment",
-    "export DEBIAN_FRONTEND=noninteractive",
+    inline = [
+      "echo 'export DEBIAN_FRONTEND=noninteractive' | sudo tee -a /etc/environment",
+      "export DEBIAN_FRONTEND=noninteractive",
 
-    # Update package list and upgrade all packages
-    "echo 'Upgrading all packages...'",
-    "sudo apt-get update -y",
-    "sudo apt-get upgrade -y",
+      # Update package list and upgrade all packages
+      "echo 'Upgrading all packages...'",
+      "sudo apt-get update -y",
+      "sudo apt-get upgrade -y",
 
-    # Add MySQL repository and install required dependencies
-    "echo 'Installing MySQL dependencies...'",
-    "sudo apt-get install -y wget lsb-release gnupg",
-    "wget -c https://repo.mysql.com//mysql-apt-config_0.8.22-1_all.deb",
-    "sudo apt-get update -y",
+      # Install MySQL Server and Client
+      "echo 'Installing MySQL server and client...'",
+      "sudo apt-get install -y mysql-server mysql-client || { echo 'MySQL installation failed'; exit 1; }",
 
-    # Install MySQL Server and MySQL Client
-    "echo 'Installing MySQL server and client...'",
-    "sudo apt-get install -y mysql-server mysql-client || { echo 'MySQL installation failed'; exit 1; }",
+      # Install pip3 and virtual environment
+      "echo 'Installing pip3 and setting up virtual environment...'",
+      "sudo apt-get install -y python3-pip python3-venv || { echo 'Python installation failed'; exit 1; }",
 
-    # Install pip3 (needed for Python package installations)
-    "echo 'Installing pip3...'",
-    "sudo apt-get install -y python3-pip python3-venv || { echo 'Python installation failed'; exit 1; }",
+      # Start and Enable MySQL Service
+      "echo 'Starting MySQL service...'",
+      "sudo systemctl enable mysql",
+      "sudo systemctl start mysql",
 
-    # Start and Enable MySQL Service
-    "echo 'Starting MySQL service...'",
-    "sudo systemctl enable mysql",
-    "sudo systemctl start mysql",
+      # Create the csye6225 group and user
+      "echo 'Creating user csye6225 with no login shell...'",
+      "sudo groupadd csye6225 || { echo 'Group creation failed'; exit 1; }",
+      "sudo useradd -r -m -s /usr/sbin/nologin -g csye6225 csye6225 || { echo 'User creation failed'; exit 1; }",
 
-    # Create the csye6225 group
-    "echo 'Creating group csye6225...'",
-    "sudo groupadd csye6225 || { echo 'Group creation failed'; exit 1; }",
+      # Create WebApp Directory & Virtual Environment
+      "echo 'Setting up Flask web application...'",
+      "sudo mkdir -p /home/csye6225/webapp",
+      "sudo chown -R csye6225:csye6225 /home/csye6225/webapp",
+      "sudo -u csye6225 python3 -m venv /home/csye6225/webapp/venv",
 
-    # Create a Python virtual environment
-    "echo 'Creating Python virtual environment...'",
-    "python3 -m venv /home/ubuntu/webapp/venv",
+      # Install Python Dependencies
+      "echo 'Installing Flask dependencies...'",
+      "sudo -u csye6225 /home/csye6225/webapp/venv/bin/pip install Flask Flask-SQLAlchemy Flask-Migrate python-dotenv mysql-connector-python werkzeug pytest",
 
-    # Activate the virtual environment and install dependencies
-    "echo 'Activating virtual environment and installing dependencies...'",
-    ". /home/ubuntu/webapp/venv/bin/activate && pip install --upgrade pip && pip install Flask==2.2.2 Flask-SQLAlchemy==3.0.2 Flask-Migrate==3.1.0 python-dotenv==0.21.0 mysql-connector-python==8.0.31 werkzeug==2.2.2 pytest==8.3.4 || exit 1",
+      # Create systemd service file
+      "echo 'Creating systemd service file...'",
+      "cat <<EOF | sudo tee /etc/systemd/system/webapp.service
+[Unit]
+Description=Flask Web Application
+After=network.target
 
-    # Create user csye6225 with no login shell
-    "echo 'Creating user csye6225 with no login shell...'",
-    "sudo useradd -r -m -s /usr/sbin/nologin -g csye6225 csye6225 || { echo 'User creation failed'; exit 1; }",
+[Service]
+User=csye6225
+Group=csye6225
+WorkingDirectory=/home/csye6225/webapp
+ExecStart=/home/csye6225/webapp/venv/bin/python /home/csye6225/webapp/app.py
+Restart=always
+Environment=FLASK_APP=app.py
+Environment=FLASK_ENV=production
+Environment=PATH=/home/csye6225/webapp/venv/bin:$PATH
 
-    # Restart MySQL service to apply changes
-    "echo 'Restarting MySQL service...'",
-    "sudo systemctl restart mysql || exit 1",
+[Install]
+WantedBy=multi-user.target
+EOF
+",
 
-    # Check MySQL installation
-    "echo 'Checking MySQL installation...'",
-    "mysql --version || { echo 'MySQL installation failed'; exit 1; }",
-
-    # Check virtual environment
-    "echo 'Checking virtual environment...'",
-    "which python || { echo 'Virtual environment activation failed'; exit 1; }"
-  ]
-}
-
-
+      # Reload systemd and enable service
+      "echo 'Reloading systemd daemon...'",
+      "sudo systemctl daemon-reload || { echo 'Daemon reload failed'; exit 1; }",
+      "echo 'Enabling webapp service...'",
+      "sudo systemctl enable webapp || { echo 'Service enable failed'; exit 1; }",
+      "echo 'Starting webapp service...'",
+      "sudo systemctl start webapp || { echo 'Service start failed'; exit 1; }"
+    ]
+  }
 }

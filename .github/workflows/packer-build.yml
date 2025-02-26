@@ -34,49 +34,45 @@ jobs:
         with:
           python-version: "3.10"
           cache: pip
-          cache-dependency-path: |
-            requirements/base.txt
-            requirements/local.txt
 
       - name: Install Dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements/local.txt
+          pip install -r requirements.txt  # Ensure this file exists
 
       - name: Test with pytest
-        run: python manage.py test
+        run: pytest  # Ensure your tests are configured
 
   check_format:
     runs-on: ubuntu-latest
-    env:
-      PKR_VAR_ami_users: ${{ secrets.AMI_USERS }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
       - name: Install Packer
-        run: sudo apt-get update && sudo apt-get install -y packer
+        run: |
+          sudo apt-get update && sudo apt-get install -y packer
       - name: Check Packer file format
         run: |
-          if ! packer fmt -check packer; then
-            echo "Packer format is not correct. Please run 'packer fmt' to fix the issue."
+          if ! packer fmt -check -diff .; then
+            echo "Packer format is incorrect. Run 'packer fmt' locally."
             exit 1
           fi
-      - name: Check Packer file validity
+      - name: Validate Packer Template
         run: |
-          packer init packer
-          if ! packer validate packer; then
-            echo "Packer files are not valid."
+          packer init .
+          if ! packer validate .; then
+            echo "Packer template validation failed!"
             exit 1
           fi
 
   packer-build:
     name: Packer Build
     runs-on: ubuntu-latest
+    needs: [check_format]
     env:
       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-      AWS_DEFAULT_REGION: ${{ secrets.REGION }}
-      PKR_VAR_ami_users: ${{ secrets.AMI_USERS }}
+      AWS_DEFAULT_REGION: ${{ secrets.AWS_REGION }}
 
     if: github.event.pull_request.merged == true
     steps:
@@ -84,19 +80,15 @@ jobs:
         uses: actions/checkout@v2
       - name: Install Packer
         run: sudo apt-get update && sudo apt-get install -y packer
-      - name: Initialize packer
-        run: packer init packer
-      - name: Build Packer image
-        run: packer build packer
+      - name: Initialize Packer
+        run: packer init .
+      - name: Build Packer Image
+        run: packer build packer-template.pkr.hcl
 
   update-launch-template:
-    name: Update launch template
+    name: Update AWS Launch Template
     runs-on: ubuntu-latest
-    needs: packer-build
-    env:
-      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID_DEMO }}
-      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY_DEMO }}
-      AWS_DEFAULT_REGION: ${{ secrets.REGION }}
+    needs: [packer-build]
     steps:
       - name: Checkout repository
         uses: actions/checkout@v2
@@ -106,37 +98,42 @@ jobs:
           sudo apt-get update && sudo apt-get install -y awscli
 
       - name: Get latest AMI ID
-        id: vars
+        id: ami_vars
         run: |
           latest_ami=$(aws ec2 describe-images --executable-users self --query 'sort_by(Images, &CreationDate)[-1].ImageId' --output text)
           echo "Latest AMI ID: $latest_ami"
+          echo "latest_ami=$latest_ami" >> $GITHUB_ENV
 
           version_number=$(aws ec2 describe-launch-template-versions --launch-template-name asg_launch_config --query 'sort_by(LaunchTemplateVersions, &VersionNumber)[-1].VersionNumber' --output text)
-          echo "Latest AMI version: $version_number"
-
-          echo "latest_ami=$latest_ami" >> $GITHUB_OUTPUT
-          echo "version_number=$version_number" >> $GITHUB_OUTPUT
+          echo "version_number=$version_number" >> $GITHUB_ENV
 
       - name: Create new Launch Template version
         run: |
-          aws ec2 create-launch-template-version --launch-template-name asg_launch_config  --launch-template-data "ImageId=${{ steps.vars.outputs.latest_ami }}" --source-version ${{ steps.vars.outputs.version_number }}
-      
-      - name: Autoscaling group instance refresh
+          aws ec2 create-launch-template-version --launch-template-name asg_launch_config \
+            --launch-template-data "ImageId=${{ env.latest_ami }}" \
+            --source-version ${{ env.version_number }}
+
+      - name: Start AWS Auto Scaling Group Refresh
         run: |
-          aws autoscaling start-instance-refresh --auto-scaling-group-name csye6225-asg-spring2023 --strategy Rolling --desired-configuration '{"LaunchTemplate": {"LaunchTemplateName":"asg_launch_config", "Version":"$Latest"}}'
+          aws autoscaling start-instance-refresh --auto-scaling-group-name csye6225-asg-spring2023 --strategy Rolling \
+            --desired-configuration '{"LaunchTemplate": {"LaunchTemplateName":"asg_launch_config", "Version":"$Latest"}}'
 
   setup-aws-gcp:
-    name: Set up AWS & GCP CLI on Runner
+    name: Set Up AWS & GCP CLI
     runs-on: ubuntu-latest
     steps:
-      - name: Set up AWS CLI
-        uses: aws-actions/configure-aws-credentials@v2
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_REGION }}
-      - name: Set up GCP CLI
-        uses: google-github-actions/setup-gcloud@v1
-        with:
-          version: latest
- 
+      - name: Install AWS CLI
+        run: |
+          sudo apt-get update && sudo apt-get install -y awscli
+      - name: Install GCP CLI
+        run: |
+          sudo apt-get install -y curl
+          curl -O https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-441.0.0-linux-x86_64.tar.gz
+          tar -xvf google-cloud-cli-441.0.0-linux-x86_64.tar.gz
+          ./google-cloud-sdk/install.sh --quiet
+          echo "export PATH=\$PATH:$(pwd)/google-cloud-sdk/bin" >> $GITHUB_ENV
+      - name: Authenticate GCP CLI
+        run: |
+          echo "${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}" > gcp-key.json
+          gcloud auth activate-service-account --key-file=gcp-key.json
+          gcloud config set project ${{ secrets.GCP_PROJECT_ID }}
