@@ -27,7 +27,10 @@ jobs:
 
       - name: Configure AWS CLI credentials
         run: |
-          # AWS CLI is already installed, so we configure it using environment variables.
+          # Ensure the .aws directory exists
+          mkdir -p ~/.aws
+
+          # Configure AWS CLI with the provided credentials
           echo "[default]" > ~/.aws/config
           echo "aws_access_key_id=${{ secrets.AWS_ACCESS_KEY_ID }}" >> ~/.aws/credentials
           echo "aws_secret_access_key=${{ secrets.AWS_SECRET_ACCESS_KEY }}" >> ~/.aws/credentials
