@@ -95,7 +95,7 @@ jobs:
           echo "First 100 characters of gcp-key.json:"
           head -c 100 gcp-key.json || echo "ERROR: gcp-key.json is empty!"
 
-          # Authenticate with GCP
+          # Authenticate with GCP 
           gcloud auth activate-service-account --key-file=gcp-key.json
           gcloud config set project ${{ secrets.GCP_PROJECT_ID }}
 
