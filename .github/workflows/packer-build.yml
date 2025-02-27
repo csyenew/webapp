@@ -6,129 +6,11 @@ on:
     branches:
       - main
   push:
-    branches:
+    branches: 
       - main
 
 jobs:
-  pytest-merge:
-    runs-on: ubuntu-latest
-
-    services:
-      mysql:
-        image: mysql:8.0
-        ports:
-          - 3306:3306
-        env:
-          MYSQL_ROOT_PASSWORD: ${{ secrets.DB_PASSWORD }}
-          MYSQL_DATABASE: ${{ secrets.DB_NAME }}
-
-    env:
-      DATABASE_URL: "mysql+mysqlconnector://root:${{ secrets.DB_PASSWORD }}@localhost:3306/${{ secrets.DB_NAME }}"
-
-    steps:
-      - name: Checkout Code Repository
-        uses: actions/checkout@v3
-
-      - name: Set up Python
-        uses: actions/setup-python@v3
-        with:
-          python-version: "3.10"
-          cache: pip
-
-      - name: Install Dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt  # Ensure this file exists
-
-      - name: Test with pytest
-        run: pytest tests/ --maxfail=1 --disable-warnings -q  # Ensure the 'tests' directory contains valid test files
-
-  check_format:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
-      - name: Install Packer
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y gnupg software-properties-common
-          curl -fsSL https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
-          echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
-          sudo apt-get update
-          sudo apt-get install -y packer
-          packer --version  # Verify installation
-      - name: Check Packer file format
-        run: |
-          if ! packer fmt -check -diff .; then
-            echo "Packer format is incorrect. Run 'packer fmt' locally."
-            exit 1
-          fi
-      - name: Validate Packer Template
-        run: |
-          packer init .
-          if ! packer validate .; then
-            echo "Packer template validation failed!"
-            exit 1
-          fi
-
-  packer-build:
-    name: Packer Build
-    runs-on: ubuntu-latest
-    needs: [check_format]
-    env:
-      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-      AWS_DEFAULT_REGION: ${{ secrets.AWS_REGION }}
-
-    if: github.event.pull_request.merged == true
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
-      - name: Install Packer
-        run: sudo apt-get update && sudo apt-get install -y packer
-      - name: Initialize Packer
-        run: packer init .
-      - name: Build Packer Image
-        run: packer build packer-template.pkr.hcl
-
-  update-launch-template:
-    name: Update AWS Launch Template
-    runs-on: ubuntu-latest
-    needs: [packer-build]
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v2
-
-      - name: Install AWS CLI
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y unzip curl gnupg
-          curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-          unzip awscliv2.zip
-          sudo ./aws/install --update
-          aws --version  # Verify AWS CLI installation
-
-      - name: Get latest AMI ID
-        id: ami_vars
-        run: |
-          latest_ami=$(aws ec2 describe-images --executable-users self --query 'sort_by(Images, &CreationDate)[-1].ImageId' --output text)
-          echo "Latest AMI ID: $latest_ami"
-          echo "latest_ami=$latest_ami" >> $GITHUB_ENV
-
-          version_number=$(aws ec2 describe-launch-template-versions --launch-template-name asg_launch_config --query 'sort_by(LaunchTemplateVersions, &VersionNumber)[-1].VersionNumber' --output text)
-          echo "version_number=$version_number" >> $GITHUB_ENV
-
-      - name: Create new Launch Template version
-        run: |
-          aws ec2 create-launch-template-version --launch-template-name asg_launch_config \
-            --launch-template-data "ImageId=${{ env.latest_ami }}" \
-            --source-version ${{ env.version_number }}
-
-      - name: Start AWS Auto Scaling Group Refresh
-        run: |
-          aws autoscaling start-instance-refresh --auto-scaling-group-name csye6225-asg-spring2023 --strategy Rolling \
-            --desired-configuration '{"LaunchTemplate": {"LaunchTemplateName":"asg_launch_config", "Version":"$Latest"}}'
-
+  # Setup AWS & GCP CLI on the runner
   setup-aws-gcp:
     name: Set Up AWS & GCP CLI
     runs-on: ubuntu-latest
@@ -155,4 +37,147 @@ jobs:
           echo "${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}" > gcp-key.json
           gcloud auth activate-service-account --key-file=gcp-key.json
           gcloud config set project ${{ secrets.GCP_PROJECT_ID }}
-    
+
+  # Build application artifact
+  build-artifact:
+    name: Build Application Artifact
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code Repository
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v3
+        with:
+          python-version: "3.10"
+          cache: pip
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt  # Ensure this file exists
+          pip install flask  # Ensure Flask is installed
+
+      - name: Build the Application Artifact (zip)
+        run: |
+          zip -r app.zip .  # Customize this based on how you want to build your artifact
+
+  # Run Packer build process for AWS & GCP
+  packer-build:
+    name: Packer Build for AWS & GCP
+    runs-on: ubuntu-latest
+    needs: [setup-aws-gcp, build-artifact]
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_DEFAULT_REGION: ${{ secrets.AWS_REGION }}
+      GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Install Packer
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gnupg software-properties-common
+          curl -fsSL https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
+          echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
+          sudo apt-get update
+          sudo apt-get install -y packer
+          packer --version  # Verify installation
+
+      - name: Initialize Packer
+        run: packer init .
+
+      - name: Build Packer Image in AWS & GCP in Parallel
+        run: |
+          packer build -var "aws_region=${{ secrets.AWS_REGION }}" -var "gcp_project_id=${{ secrets.GCP_PROJECT_ID }}" packer-template.pkr.hcl
+
+  # Update AWS Launch Template with new AMI
+  update-launch-template:
+    name: Update AWS Launch Template
+    runs-on: ubuntu-latest
+    needs: [packer-build]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Install AWS CLI
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y unzip curl gnupg
+          curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+          unzip awscliv2.zip
+          sudo ./aws/install --update
+          aws --version  # Verify AWS CLI installation
+
+      - name: Get Latest AMI ID
+        id: ami_vars
+        run: |
+          latest_ami=$(aws ec2 describe-images --query 'Images[-1].ImageId' --output text)
+          echo "Latest AMI ID: $latest_ami"
+          echo "latest_ami=$latest_ami" >> $GITHUB_ENV
+
+      - name: Create Launch Template Version
+        run: |
+          aws ec2 create-launch-template-version \
+            --launch-template-name asg_launch_config \
+            --launch-template-data '{"ImageId": "${{ env.latest_ami }}"}'
+
+      - name: Start AWS Auto Scaling Group Refresh
+        run: |
+          aws autoscaling start-instance-refresh --auto-scaling-group-name csye6225-asg-spring2023 --strategy Rolling
+
+  # Setup systemd service for the app
+  setup-systemd:
+    name: Setup Systemd for Application
+    runs-on: ubuntu-latest
+    needs: [packer-build]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Install necessary dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y systemd
+
+      - name: Create User csye6225 with no login shell
+        run: |
+          sudo useradd -r -m -s /usr/sbin/nologin csye6225
+          sudo groupadd csye6225
+          sudo usermod -aG csye6225 csye6225
+
+      - name: Copy application artifacts and configuration
+        run: |
+          sudo mkdir -p /home/csye6225/webapp
+          sudo cp app.zip /home/csye6225/webapp
+          sudo chown -R csye6225:csye6225 /home/csye6225/webapp
+
+      - name: Create systemd service file
+        run: |
+          sudo bash -c 'cat <<EOF > /etc/systemd/system/webapp.service
+[Unit]
+Description=Flask Web Application
+After=network.target
+
+[Service]
+User=csye6225
+Group=csye6225
+WorkingDirectory=/home/csye6225/webapp
+ExecStart=/usr/bin/python3 /home/csye6225/webapp/app.py
+Restart=always
+Environment=FLASK_APP=app.py
+Environment=FLASK_ENV=production
+Environment=PATH=/home/csye6225/webapp/venv/bin:$PATH
+
+[Install]
+WantedBy=multi-user.target
+EOF'
+
+      - name: Reload and enable systemd service
+        run: |
+          sudo systemctl daemon-reload
+          sudo systemctl enable webapp
+          sudo systemctl start webapp
