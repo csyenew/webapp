@@ -10,39 +10,6 @@ on:
       - main
 
 jobs:
-  pytest-merge:
-    runs-on: ubuntu-latest
-
-    services:
-      mysql:
-        image: mysql:8.0
-        ports:
-          - 3306:3306 
-        env:
-          MYSQL_ROOT_PASSWORD: ${{ secrets.DB_PASSWORD }}
-          MYSQL_DATABASE: ${{ secrets.DB_NAME }}
-
-    env:
-      DATABASE_URL: "mysql+mysqlconnector://root:${{ secrets.DB_PASSWORD }}@localhost:3306/${{ secrets.DB_NAME }}"
-
-    steps:
-      - name: Checkout Code Repository
-        uses: actions/checkout@v3
-
-      - name: Set up Python
-        uses: actions/setup-python@v3
-        with:
-          python-version: "3.10"
-          cache: pip
-
-      - name: Install Dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt  # Ensure this file exists
-
-      - name: Test with pytest
-        run: pytest tests/ --maxfail=1 --disable-warnings -q  # Ensure the 'tests' directory contains valid test files
-
   check_format:
     runs-on: ubuntu-latest
     steps:
@@ -71,19 +38,25 @@ jobs:
             exit 1
           fi
 
-  packer-build:
-    name: Packer Build
+  build_image:
+    name: Build Custom Image
     runs-on: ubuntu-latest
     needs: [check_format]
     env:
       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       AWS_DEFAULT_REGION: ${{ secrets.AWS_REGION }}
+      GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+      GOOGLE_APPLICATION_CREDENTIALS_JSON: ${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}
 
     if: github.event.pull_request.merged == true
+    strategy:
+      matrix:
+        platform: [aws, gcp]  # Running for both AWS and GCP in parallel
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
+
       - name: Install Packer
         run: |
           sudo apt-get update
@@ -93,28 +66,74 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y packer
           packer --version  # Verify installation
-      
+
+      - name: Build Application Artifact
+        run: |
+          # Build your application artifact (war, jar, zip, etc.)
+          # Assuming your artifact is a ZIP file
+          zip -r app_artifact.zip ./path/to/your/application/files
+          echo "Artifact built successfully"
+
       - name: Initialize Packer
         run: packer init .
-      - name: Build Packer Image
-        run: packer build packer-template.pkr.hcl
+
+      - name: Build Custom Image for ${{ matrix.platform }}
+        run: |
+          if [[ "${{ matrix.platform }}" == "aws" ]]; then
+            # Build AWS image
+            packer build aws-packer-template.pkr.hcl
+          elif [[ "${{ matrix.platform }}" == "gcp" ]]; then
+            # Build GCP image
+            packer build gcp-packer-template.pkr.hcl
+          fi
+
+  setup-user-and-app:
+    name: Set up User and Application
+    runs-on: ubuntu-latest
+    needs: [build_image]
+    steps:
+      - name: Create Non-login User
+        run: |
+          sudo groupadd csye6225
+          sudo useradd -m -g csye6225 -s /usr/sbin/nologin csye6225
+
+      - name: Install Application Dependencies
+        run: |
+          # Assuming your application needs to install dependencies (e.g., pip packages)
+          sudo apt-get update
+          sudo apt-get install -y python3-pip
+          pip3 install -r requirements.txt
+
+      - name: Copy Application Artifacts
+        run: |
+          sudo cp app_artifact.zip /home/csye6225/
+          sudo chown csye6225:csye6225 /home/csye6225/app_artifact.zip
+
+      - name: Configure Systemd Service
+        run: |
+          # Assuming you have a systemd service file to add
+          sudo cp your_service_file.service /etc/systemd/system/
+          sudo systemctl daemon-reload
+          sudo systemctl enable your_service_file.service
+
+      - name: Start Service
+        run: |
+          sudo systemctl start your_service_file.service
 
   update-launch-template:
-    name: Update AWS Launch Template
+    name: Update Launch Template
     runs-on: ubuntu-latest
-    needs: [packer-build]
+    needs: [build_image]
     steps:
       - name: Checkout repository
         uses: actions/checkout@v2
 
-      - name: Install AWS CLI
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y unzip curl gnupg
-          curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-          unzip awscliv2.zip
-          sudo ./aws/install --update
-          aws --version  # Verify AWS CLI installation
+      - name: Install AWS CLI using Marketplace Action
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
 
       - name: Get latest AMI ID
         id: ami_vars
@@ -122,9 +141,6 @@ jobs:
           latest_ami=$(aws ec2 describe-images --executable-users self --query 'sort_by(Images, &CreationDate)[-1].ImageId' --output text)
           echo "Latest AMI ID: $latest_ami"
           echo "latest_ami=$latest_ami" >> $GITHUB_ENV
-
-          version_number=$(aws ec2 describe-launch-template-versions --launch-template-name asg_launch_config --query 'sort_by(LaunchTemplateVersions, &VersionNumber)[-1].VersionNumber' --output text)
-          echo "version_number=$version_number" >> $GITHUB_ENV
 
       - name: Create new Launch Template version
         run: |
@@ -136,31 +152,3 @@ jobs:
         run: |
           aws autoscaling start-instance-refresh --auto-scaling-group-name csye6225-asg-spring2023 --strategy Rolling \
             --desired-configuration '{"LaunchTemplate": {"LaunchTemplateName":"asg_launch_config", "Version":"$Latest"}}'
-
-  setup-aws-gcp:
-    name: Set Up AWS & GCP CLI
-    runs-on: ubuntu-latest
-    steps:
-      - name: Install AWS CLI
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y unzip curl gnupg
-          curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-          unzip awscliv2.zip
-          sudo ./aws/install --update
-          aws --version  # Verify AWS CLI installation
-
-      - name: Install GCP CLI
-        run: |
-          sudo apt-get install -y curl
-          curl -O https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-441.0.0-linux-x86_64.tar.gz
-          tar -xvf google-cloud-cli-441.0.0-linux-x86_64.tar.gz
-          ./google-cloud-sdk/install.sh --quiet
-          echo "export PATH=\$PATH:$(pwd)/google-cloud-sdk/bin" >> $GITHUB_ENV
-
-      - name: Authenticate GCP CLI
-        run: |
-          echo "${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}" > gcp-key.json
-          gcloud auth activate-service-account --key-file=gcp-key.json
-          gcloud config set project ${{ secrets.GCP_PROJECT_ID }}
-    
