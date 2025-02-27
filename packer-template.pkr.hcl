@@ -117,9 +117,43 @@ build {
 
     # Check virtual environment
     "echo 'Checking virtual environment...'",
-    "which python || { echo 'Virtual environment activation failed'; exit 1; }"
-  ]
-}
+    "which python || { echo 'Virtual environment activation failed'; exit 1; }",
 
+    
 
+]
+  }
+
+    # Create systemd service for Flask app using a script file
+  provisioner "file" {
+    content = <<EOF
+[Unit]
+Description=Flask Web Application
+After=network.target
+
+[Service]
+User=csye6225
+Group=csye6225
+WorkingDirectory=/home/csye6225/webapp
+ExecStart=/home/csye6225/webapp/venv/bin/python /home/csye6225/webapp/app.py
+Restart=always
+Environment="FLASK_APP=app.py"
+Environment="FLASK_ENV=production"
+Environment="PATH=/home/csye6225/webapp/venv/bin:$PATH"
+
+[Install]
+WantedBy=multi-user.target
+EOF
+    destination = "/tmp/webapp.service"
+  }
+
+  provisioner "shell" {
+    inline = [
+      "sudo mv /tmp/webapp.service /etc/systemd/system/webapp.service",
+      "sudo chmod 644 /etc/systemd/system/webapp.service",
+      "sudo systemctl daemon-reload",
+      "sudo systemctl enable webapp",
+      "sudo systemctl start webapp"
+    ]
+  }
 }
