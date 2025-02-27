@@ -101,7 +101,7 @@ jobs:
           echo "Artifact built successfully"
 
       - name: Upload Artifact
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: app_artifact
           path: app_artifact.zip
@@ -110,10 +110,10 @@ jobs:
         run: |
           if [[ "${{ matrix.platform }}" == "aws" ]]; then
             # Build AWS image
-            packer build -var 'aws_access_key=${{ secrets.AWS_ACCESS_KEY_ID }}' -var 'aws_secret_key=${{ secrets.AWS_SECRET_ACCESS_KEY }}' -var 'artifact_path=app_artifact.zip' template.json
+            packer build -var 'aws_access_key=${{ secrets.AWS_ACCESS_KEY_ID }}' -var 'aws_secret_key=${{ secrets.AWS_SECRET_ACCESS_KEY }}' -var 'artifact_path=app_artifact.zip' packer-template.pkr.hcl
           elif [[ "${{ matrix.platform }}" == "gcp" ]]; then
             # Build GCP image
-            packer build -var 'gcp_project_id=csye-dev-451921-452108' -var 'gcp_credentials_file=gcp-key.json' -var 'artifact_path=app_artifact.zip' template.json
+            packer build -var 'gcp_project_id=csye-dev-451921-452108' -var 'gcp_credentials_file=gcp-key.json' -var 'artifact_path=app_artifact.zip' packer-template.pkr.hcl
 
       - name: Create local user csye6225
         run: |
