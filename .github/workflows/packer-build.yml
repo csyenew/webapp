@@ -126,65 +126,13 @@ jobs:
           sudo systemctl daemon-reload
           sudo systemctl enable webapp.service
 
-  setup-user-and-app:
-    name: Set Up User and Application
-    runs-on: ubuntu-latest
-    needs: [build]
-    steps:
-      - name: Create Non-login User
-        run: |
-          sudo groupadd csye6225
-          sudo useradd -m -g csye6225 -s /usr/sbin/nologin csye6225
-
-      - name: Install Application Dependencies
-        run: |
-          # Assuming your application needs to install dependencies (e.g., pip packages)
-          sudo apt-get update
-          sudo apt-get install -y python3-pip
-          pip3 install -r requirements.txt
-
-      - name: Copy Application Artifacts
-        run: |
-          sudo cp app_artifact.zip /home/csye6225/
-          sudo chown csye6225:csye6225 /home/csye6225/app_artifact.zip
-
-      - name: Configure Systemd Service
-        run: |
-          # Assuming you have a systemd service file to add
-          sudo cp your_service_file.service /etc/systemd/system/
-          sudo systemctl daemon-reload
-          sudo systemctl enable your_service_file.service
-
-      - name: Start Service
-        run: |
-          sudo systemctl start your_service_file.service
-
   update-launch-template:
     name: Update Launch Template
     runs-on: ubuntu-latest
     needs: [build]
     steps:
-      - name: Checkout repository
+      - name: Checkout code
         uses: actions/checkout@v2
-
-      - name: Install AWS CLI
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y unzip curl gnupg
-          curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-          unzip awscliv2.zip
-          sudo ./aws/install --update
-          aws --version  # Verify AWS CLI installation
-
-      - name: Get latest AMI ID
-        id: ami_vars
-        run: |
-          latest_ami=$(aws ec2 describe-images --executable-users self --query 'sort_by(Images, &CreationDate)[-1].ImageId' --output text)
-          echo "Latest AMI ID: $latest_ami"
-          echo "latest_ami=$latest_ami" >> $GITHUB_ENV
-
-          version_number=$(aws ec2 describe-launch-template-versions --launch-template-name asg_launch_config --query 'sort_by(LaunchTemplateVersions, &VersionNumber)[-1].VersionNumber' --output text)
-          echo "version_number=$version_number" >> $GITHUB_ENV
 
       - name: Create new Launch Template version
         run: |
