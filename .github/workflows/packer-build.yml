@@ -72,7 +72,7 @@ jobs:
           echo "[default]" > ~/.aws/config
           echo "aws_access_key_id=${{ secrets.AWS_ACCESS_KEY_ID }}" >> ~/.aws/credentials
           echo "aws_secret_access_key=${{ secrets.AWS_SECRET_ACCESS_KEY }}" >> ~/.aws/credentials
-          echo "region=${{ secrets.AWS_REGION }}" >> ~/..aws/config
+          echo "region=${{ secrets.AWS_REGION }}" >> ~/.aws/config
 
       - name: Install GCP CLI
         run: |
