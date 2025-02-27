@@ -101,7 +101,7 @@ jobs:
           echo "Artifact built successfully"
 
       - name: Upload Artifact
-        uses: actions/upload-artifact@v3.1.1
+        uses: actions/upload-artifact@v3.1.2
         with:
           name: app_artifact
           path: app_artifact.zip
