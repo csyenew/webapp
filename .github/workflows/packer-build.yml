@@ -27,10 +27,11 @@ jobs:
 
       - name: Configure AWS CLI credentials
         run: |
-          # Configure AWS CLI with the provided credentials
-          aws configure set aws_access_key_id ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws configure set aws_secret_access_key ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws configure set region ${{ secrets.AWS_REGION }}
+          # AWS CLI is already installed, so we configure it using environment variables.
+          echo "[default]" > ~/.aws/config
+          echo "aws_access_key_id=${{ secrets.AWS_ACCESS_KEY_ID }}" >> ~/.aws/credentials
+          echo "aws_secret_access_key=${{ secrets.AWS_SECRET_ACCESS_KEY }}" >> ~/.aws/credentials
+          echo "region=${{ secrets.AWS_REGION }}" >> ~/.aws/config
 
       - name: Install GCP CLI manually
         run: |
