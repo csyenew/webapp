@@ -98,7 +98,7 @@ jobs:
           # Authenticate with GCP 
           gcloud auth activate-service-account --key-file=gcp-key.json
           gcloud config set project ${{ secrets.GCP_PROJECT_ID }}
-        shell: /usr/bin/bash -e
+        shell: bash
 
       - name: Run Integration Tests
         run: |
