@@ -12,7 +12,7 @@ packer {
     }
   }
 }
-
+ 
 # Define variables for AWS and GCP
 variable "aws_region" {
   default = "us-east-1"
