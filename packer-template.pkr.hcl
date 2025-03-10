@@ -12,7 +12,7 @@ packer {
     }
   }
 }
-
+ 
 # Define variables for AWS and GCP
 variable "aws_region" {
   default = "us-east-1"
@@ -24,7 +24,7 @@ variable "gcp_project_id" {
 
 # AWS Source Configuration
 source "amazon-ebs" "ubuntu_custom_aws" {
-  region = var.aws_region
+  region     = var.aws_region
   source_ami_filter {
     filters = {
       name                = "ubuntu/images/*ubuntu-jammy-22.04-amd64-server-*"
@@ -80,25 +80,23 @@ build {
       "sudo -u csye6225 python3 -m venv /home/csye6225/webapp/venv",
       "sudo -u csye6225 /home/csye6225/webapp/venv/bin/pip install Flask Flask-SQLAlchemy Flask-Migrate python-dotenv mysql-connector-python werkzeug pytest",
 
-      # Create systemd service file using heredoc (✅ Corrected version)
-      "cat <<EOF | sudo tee /etc/systemd/system/webapp.service >/dev/null
-[Unit]
-Description=Flask Web Application
-After=network.target
-
-[Service]
-User=csye6225
-Group=csye6225
-WorkingDirectory=/home/csye6225/webapp
-ExecStart=/home/csye6225/webapp/venv/bin/python /home/csye6225/webapp/app.py
-Restart=always
-Environment=FLASK_APP=app.py
-Environment=FLASK_ENV=production
-Environment=PATH=/home/csye6225/webapp/venv/bin:$PATH
-
-[Install]
-WantedBy=multi-user.target
-EOF",
+      # Corrected systemd service file creation
+      "sudo bash -c 'cat > /etc/systemd/system/webapp.service <<EOF\n" +
+      "[Unit]\n" +
+      "Description=Flask Web Application\n" +
+      "After=network.target\n\n" +
+      "[Service]\n" +
+      "User=csye6225\n" +
+      "Group=csye6225\n" +
+      "WorkingDirectory=/home/csye6225/webapp\n" +
+      "ExecStart=/home/csye6225/webapp/venv/bin/python /home/csye6225/webapp/app.py\n" +
+      "Restart=always\n" +
+      "Environment=FLASK_APP=app.py\n" +
+      "Environment=FLASK_ENV=production\n" +
+      "Environment=PATH=/home/csye6225/webapp/venv/bin:$PATH\n\n" +
+      "[Install]\n" +
+      "WantedBy=multi-user.target\n" +
+      "EOF'",
 
       # Enable and start the service
       "sudo systemctl daemon-reload",
