@@ -83,13 +83,16 @@ jobs:
           gcloud --version  # Verify installation
 
       - name: Decode and Store GCP Credentials
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS_JSON: ${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}
+          GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
         run: |
-          if [[ -z "${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}" ]]; then
+          if [[ -z "$GOOGLE_APPLICATION_CREDENTIALS_JSON" ]]; then
             echo "ERROR: GOOGLE_APPLICATION_CREDENTIALS_JSON is empty or missing!"
             exit 1
           fi
 
-          echo "${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}" > gcp-key.json
+          echo "$GOOGLE_APPLICATION_CREDENTIALS_JSON" > gcp-key.json
           
           # Debugging: Ensure the file is not empty
           echo "First 100 characters of gcp-key.json:"
@@ -97,8 +100,9 @@ jobs:
  
           # Authenticate with GCP 
           gcloud auth activate-service-account --key-file=gcp-key.json
-          gcloud config set project ${{ secrets.GCP_PROJECT_ID }}
+          gcloud config set project "$GCP_PROJECT_ID"
         shell: bash
+
 
       - name: Run Integration Tests
         run: |
