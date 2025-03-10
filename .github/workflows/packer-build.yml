@@ -101,7 +101,7 @@ jobs:
 
       - name: Authenticate with GCP
         run: |
-          echo "***" > gcp-key.json
+          echo "${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}" > gcp-key.json
           
           # Debugging: Ensure the file is not empty
           echo "First 100 characters of gcp-key.json:"
@@ -109,7 +109,7 @@ jobs:
           
           # Authenticate with GCP 
           gcloud auth activate-service-account --key-file=gcp-key.json
-          gcloud config set project YOUR_PROJECT_ID
+          gcloud config set project ${{ secrets.GCP_PROJECT_ID }}
         shell: /usr/bin/bash -e
 
       - name: Run Integration Tests
