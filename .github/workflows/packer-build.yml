@@ -92,6 +92,11 @@ jobs:
             exit 1
           fi
 
+          if [[ -z "$GCP_PROJECT_ID" ]]; then
+            echo "ERROR: GCP_PROJECT_ID is empty or missing!"
+            exit 1
+          fi
+
           echo "$GOOGLE_APPLICATION_CREDENTIALS_JSON" > gcp-key.json
           
           # Debugging: Ensure the file is not empty
@@ -102,6 +107,7 @@ jobs:
           gcloud auth activate-service-account --key-file=gcp-key.json
           gcloud config set project "$GCP_PROJECT_ID"
         shell: bash
+
 
 
       - name: Run Integration Tests
