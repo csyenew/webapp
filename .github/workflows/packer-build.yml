@@ -99,6 +99,19 @@ jobs:
           gcloud auth activate-service-account --key-file=gcp-key.json
           gcloud config set project ${{ secrets.GCP_PROJECT_ID }}
 
+      - name: Authenticate with GCP
+        run: |
+          echo "***" > gcp-key.json
+          
+          # Debugging: Ensure the file is not empty
+          echo "First 100 characters of gcp-key.json:"
+          head -c 100 gcp-key.json || echo "ERROR: gcp-key.json is empty!"
+          
+          # Authenticate with GCP 
+          gcloud auth activate-service-account --key-file=gcp-key.json
+          gcloud config set project YOUR_PROJECT_ID
+        shell: /usr/bin/bash -e
+
       - name: Run Integration Tests
         run: |
           # Add your integration test commands here
@@ -155,4 +168,3 @@ jobs:
         run: |
           aws autoscaling start-instance-refresh --auto-scaling-group-name csye6225-asg-spring2023 --strategy Rolling \
             --desired-configuration '{"LaunchTemplate": {"LaunchTemplateName":"asg_launch_config", "Version":"$Latest"}}'
- 
