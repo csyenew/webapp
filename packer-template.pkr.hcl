@@ -107,24 +107,22 @@ build {
       "sudo -u csye6225 /home/csye6225/webapp/venv/bin/pip install Flask Flask-SQLAlchemy Flask-Migrate python-dotenv mysql-connector-python werkzeug pytest",
 
       # Corrected systemd service file creation
-      "sudo tee /etc/systemd/system/webapp.service <<EOF > /dev/null
-[Unit]
-Description=Flask Web Application
-After=network.target
-
-[Service]
-User=csye6225
-Group=csye6225
-WorkingDirectory=/home/csye6225/webapp
-ExecStart=/home/csye6225/webapp/venv/bin/python /home/csye6225/webapp/app.py
-Restart=always
-Environment=FLASK_APP=app.py
-Environment=FLASK_ENV=production
-Environment=PATH=/home/csye6225/webapp/venv/bin:$PATH
-
-[Install]
-WantedBy=multi-user.target
-EOF",
+      "echo '[Unit]' | sudo tee /etc/systemd/system/webapp.service",
+      "echo 'Description=Flask Web Application' | sudo tee -a /etc/systemd/system/webapp.service",
+      "echo 'After=network.target' | sudo tee -a /etc/systemd/system/webapp.service",
+      "",
+      "echo '[Service]' | sudo tee -a /etc/systemd/system/webapp.service",
+      "echo 'User=csye6225' | sudo tee -a /etc/systemd/system/webapp.service",
+      "echo 'Group=csye6225' | sudo tee -a /etc/systemd/system/webapp.service",
+      "echo 'WorkingDirectory=/home/csye6225/webapp' | sudo tee -a /etc/systemd/system/webapp.service",
+      "echo 'ExecStart=/home/csye6225/webapp/venv/bin/python /home/csye6225/webapp/app.py' | sudo tee -a /etc/systemd/system/webapp.service",
+      "echo 'Restart=always' | sudo tee -a /etc/systemd/system/webapp.service",
+      "echo 'Environment=FLASK_APP=app.py' | sudo tee -a /etc/systemd/system/webapp.service",
+      "echo 'Environment=FLASK_ENV=production' | sudo tee -a /etc/systemd/system/webapp.service",
+      "echo 'Environment=PATH=/home/csye6225/webapp/venv/bin:$PATH' | sudo tee -a /etc/systemd/system/webapp.service",
+      "",
+      "echo '[Install]' | sudo tee -a /etc/systemd/system/webapp.service",
+      "echo 'WantedBy=multi-user.target' | sudo tee -a /etc/systemd/system/webapp.service",
 
       # Enable and start the service
       "sudo systemctl daemon-reload",

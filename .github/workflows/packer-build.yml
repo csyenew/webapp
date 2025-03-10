@@ -1,133 +1,180 @@
-packer {
-  required_version = ">= 1.8.0"
+name: Packer CI
 
-  required_plugins {
-    amazon = {
-      source  = "hashicorp/amazon"
-      version = ">= 1.0.0"
-    }
-    googlecompute = {
-      source  = "hashicorp/googlecompute"
-      version = ">= 1.0.0"
-    }
-  }
-}
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, closed]
+    branches:
+      - main
+  push:
+    branches:
+      - main
 
-# Define variables for AWS and GCP
-variable "aws_access_key" {
-  type    = string
-  default = ""
-}
+jobs:
+  packer-fmt-validate:
+    if: github.event_name == 'pull_request' && github.event.action != 'closed'
+    runs-on: ubuntu-latest
 
-variable "aws_secret_key" {
-  type    = string
-  default = ""
-}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
 
-variable "aws_region" {
-  type    = string
-  default = "us-east-1"
-}
+      - name: Install Packer
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gnupg software-properties-common
+          curl -fsSL https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
+          echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
+          sudo apt-get update
+          sudo apt-get install -y packer
+          packer --version  # Verify installation
 
-variable "gcp_project_id" {
-  type    = string
-  default = "csye-dev-451921-452108"
-}
+      - name: Run packer fmt
+        run: |
+          packer fmt -check -diff .
+        continue-on-error: false
 
-variable "gcp_credentials_file" {
-  type    = string
-  default = "gcp-key.json"
-}
+      - name: Run packer validate
+        run: |
+          packer validate .
+        continue-on-error: false
 
-variable "artifact_path" {
-  type    = string
-  default = "app_artifact.zip"
-}
+  build:
+    if: github.event.pull_request.merged == true || github.event_name == 'push'
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        platform: [aws, gcp]
 
-# AWS Source Configuration
-source "amazon-ebs" "ubuntu_custom_aws" {
-  region     = var.aws_region
-  access_key = var.aws_access_key
-  secret_key = var.aws_secret_key
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
 
-  source_ami_filter {
-    filters = {
-      name                = "ubuntu/images/*ubuntu-jammy-22.04-amd64-server-*"
-      virtualization-type = "hvm"
-      root-device-type    = "ebs"
-    }
-    most_recent = true
-    owners      = ["099720109477"]
-  }
-  ssh_username    = "ubuntu"
-  instance_type   = "t2.micro"
-  ami_name        = "ubuntu-custom-{{timestamp}}"
-  ami_description = "Custom Ubuntu 22.04 with MySQL and Flask"
-  encrypt_boot    = true
-}
+      - name: Install Packer
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gnupg software-properties-common
+          curl -fsSL https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
+          echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
+          sudo apt-get update
+          sudo apt-get install -y packer
+          packer --version  # Verify installation
 
-# GCP Source Configuration
-source "googlecompute" "ubuntu_custom_gcp" {
-  project_id          = var.gcp_project_id
-  credentials         = file(var.gcp_credentials_file)
-  source_image_family = "ubuntu-2204-lts"
-  zone                = "us-central1-a"
-  machine_type        = "e2-micro"
-  image_name          = "custom-ubuntu-24-{{timestamp}}"
-  image_family        = "custom-ubuntu"
-  image_description   = "Custom Ubuntu 24.04 LTS with MySQL and Flask"
-  ssh_username        = "ubuntu"
-}
+      - name: Install AWS CLI
+        run: |
+          curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+          unzip awscliv2.zip
+          sudo ./aws/install --update
+          aws --version  # Verify installation
 
-# Build Configuration
-build {
-  sources = [
-    "source.amazon-ebs.ubuntu_custom_aws",
-    "source.googlecompute.ubuntu_custom_gcp"
-  ]
+      - name: Configure AWS CLI
+        run: |
+          mkdir -p ~/.aws
+          echo "[default]" > ~/.aws/config
+          echo "aws_access_key_id=${{ secrets.AWS_ACCESS_KEY_ID }}" >> ~/.aws/credentials
+          echo "aws_secret_access_key=${{ secrets.AWS_SECRET_ACCESS_KEY }}" >> ~/.aws/credentials
+          echo "region=${{ secrets.AWS_REGION }}" >> ~/.aws/config
 
-  provisioner "shell" {
-    inline = [
-      "export DEBIAN_FRONTEND=noninteractive",
-      "sudo apt-get update -y && sudo apt-get upgrade -y",
-      "sudo apt-get install -y mysql-server mysql-client python3-pip python3-venv",
+      - name: Install GCP CLI
+        run: |
+          sudo apt-get update && sudo apt-get install -y curl gnupg
+          echo "deb [signed-by=/usr/share/keyrings/cloud.google.com-archive-keyring.gpg] https://packages.cloud.google.com/apt cloud-sdk main" | sudo tee -a /etc/apt/sources.list.d/google-cloud-sdk.list
+          curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo tee /usr/share/keyrings/cloud.google.com-archive-keyring.gpg
+          sudo apt-get update && sudo apt-get install google-cloud-sdk
+          gcloud --version  # Verify installation
 
-      # MySQL Setup
-      "sudo systemctl enable mysql",
-      "sudo systemctl start mysql",
+      - name: Decode and Store GCP Credentials
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS_JSON: ${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}
+          GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+        run: |
+          if [[ -z "$GOOGLE_APPLICATION_CREDENTIALS_JSON" ]]; then
+            echo "ERROR: GOOGLE_APPLICATION_CREDENTIALS_JSON is empty or missing!"
+            exit 1
+          fi
 
-      # Create user csye6225
-      "sudo groupadd csye6225 || true",
-      "sudo useradd -r -m -s /usr/sbin/nologin -g csye6225 csye6225 || true",
+          if [[ -z "$GCP_PROJECT_ID" ]]; then
+            echo "ERROR: GCP_PROJECT_ID is empty or missing!"
+            exit 1
+          fi
 
-      # Setup Flask App
-      "sudo mkdir -p /home/csye6225/webapp",
-      "sudo chown -R csye6225:csye6225 /home/csye6225/webapp",
-      "sudo -u csye6225 python3 -m venv /home/csye6225/webapp/venv",
-      "sudo -u csye6225 /home/csye6225/webapp/venv/bin/pip install Flask Flask-SQLAlchemy Flask-Migrate python-dotenv mysql-connector-python werkzeug pytest",
+          echo "$GOOGLE_APPLICATION_CREDENTIALS_JSON" > gcp-key.json
+          
+          # Debugging: Ensure the file is not empty
+          echo "First 100 characters of gcp-key.json:"
+          head -c 100 gcp-key.json || echo "ERROR: gcp-key.json is empty!"
+ 
+          # Authenticate with GCP 
+          gcloud auth activate-service-account --key-file=gcp-key.json
+          gcloud config set project "$GCP_PROJECT_ID"
+        shell: bash
 
-      # Corrected systemd service file creation
-      "echo '[Unit]' | sudo tee /etc/systemd/system/webapp.service",
-      "echo 'Description=Flask Web Application' | sudo tee -a /etc/systemd/system/webapp.service",
-      "echo 'After=network.target' | sudo tee -a /etc/systemd/system/webapp.service",
-      "",
-      "echo '[Service]' | sudo tee -a /etc/systemd/system/webapp.service",
-      "echo 'User=csye6225' | sudo tee -a /etc/systemd/system/webapp.service",
-      "echo 'Group=csye6225' | sudo tee -a /etc/systemd/system/webapp.service",
-      "echo 'WorkingDirectory=/home/csye6225/webapp' | sudo tee -a /etc/systemd/system/webapp.service",
-      "echo 'ExecStart=/home/csye6225/webapp/venv/bin/python /home/csye6225/webapp/app.py' | sudo tee -a /etc/systemd/system/webapp.service",
-      "echo 'Restart=always' | sudo tee -a /etc/systemd/system/webapp.service",
-      "echo 'Environment=FLASK_APP=app.py' | sudo tee -a /etc/systemd/system/webapp.service",
-      "echo 'Environment=FLASK_ENV=production' | sudo tee -a /etc/systemd/system/webapp.service",
-      "echo 'Environment=PATH=/home/csye6225/webapp/venv/bin:$PATH' | sudo tee -a /etc/systemd/system/webapp.service",
-      "",
-      "echo '[Install]' | sudo tee -a /etc/systemd/system/webapp.service",
-      "echo 'WantedBy=multi-user.target' | sudo tee -a /etc/systemd/system/webapp.service",
 
-      # Enable and start the service
-      "sudo systemctl daemon-reload",
-      "sudo systemctl enable webapp",
-      "sudo systemctl start webapp"
-    ]
-  }
-}
+
+      - name: Run Integration Tests
+        run: |
+          # Add your integration test commands here
+          echo "Running integration tests..."
+          # Example: ./run-integration-tests.sh
+
+      - name: Build Application Artifact
+        run: |
+          # Build your application artifact (e.g., war, jar, zip, etc.)
+          zip -r app_artifact.zip app.py webapp.service
+          echo "Artifact built successfully"
+
+      - name: Build Custom Image for ${{ matrix.platform }}
+        env:
+          PLATFORM: ${{ matrix.platform }}
+        run: |
+          if [[ "$PLATFORM" == "aws" ]]; then
+            echo "Building AWS image..."
+            packer build \
+              -var "aws_access_key=${{ secrets.AWS_ACCESS_KEY_ID }}" \
+              -var "aws_secret_key=${{ secrets.AWS_SECRET_ACCESS_KEY }}" \
+              -var "artifact_path=app_artifact.zip" \
+              packer-template.pkr.hcl
+          elif [[ "$PLATFORM" == "gcp" ]]; then
+            echo "Building GCP image..."
+            packer build \
+              -var "gcp_project_id=${{ secrets.GCP_PROJECT_ID }}" \
+              -var "gcp_credentials_file=gcp-key.json" \
+              -var "artifact_path=app_artifact.zip" \
+              packer-template.pkr.hcl
+          fi
+
+
+      - name: Create local user csye6225
+        run: |
+          sudo useradd -r -s /usr/sbin/nologin -g csye6225 csye6225
+
+      - name: Install application dependencies and setup application
+        run: |
+          # Install dependencies and copy application artifacts
+          sudo mkdir -p /home/csye6225/webapp
+          sudo unzip app_artifact.zip -d /home/csye6225/webapp
+          sudo chown -R csye6225:csye6225 /home/csye6225/webapp
+
+      - name: Add systemd service file
+        run: |
+          sudo cp /home/csye6225/webapp/webapp.service /etc/systemd/system/
+          sudo systemctl daemon-reload
+          sudo systemctl enable webapp.service
+
+  update-launch-template:
+    name: Update Launch Template
+    runs-on: ubuntu-latest
+    needs: [build]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Create new Launch Template version
+        run: |
+          aws ec2 create-launch-template-version --launch-template-name asg_launch_config \
+            --launch-template-data "ImageId=${{ env.latest_ami }}" \
+            --source-version ${{ env.version_number }}
+
+      - name: Start AWS Auto Scaling Group Refresh
+        run: | 
+          aws autoscaling start-instance-refresh --auto-scaling-group-name csye6225-asg-spring2023 --strategy Rolling \
+            --desired-configuration '{"LaunchTemplate": {"LaunchTemplateName":"asg_launch_config", "Version":"$Latest"}}'
