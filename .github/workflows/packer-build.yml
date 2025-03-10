@@ -84,13 +84,10 @@ jobs:
 
       - name: Decode and Store GCP Credentials
         run: |
-          # if [[ -z "${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}" ]]; then
-          #   echo "ERROR: GOOGLE_APPLICATION_CREDENTIALS_JSON is empty or missing!"
-          #   exit 1
-          # fi
-
-          echo "hello"
-
+          if [[ -z "${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}" ]]; then
+            echo "ERROR: GOOGLE_APPLICATION_CREDENTIALS_JSON is empty or missing!"
+            exit 1
+          fi
 
           echo "${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}" > gcp-key.json
           
@@ -98,23 +95,6 @@ jobs:
           echo "First 100 characters of gcp-key.json:"
           head -c 100 gcp-key.json || echo "ERROR: gcp-key.json is empty!"
  
-          # Authenticate with GCP 
-          gcloud auth activate-service-account --key-file=gcp-key.json
-          gcloud config set project ${{ secrets.GCP_PROJECT_ID }}
-
-      - name: Authenticate with GCP
-        run: |
-          # if [[ -z "${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}" ]]; then
-          #   echo "ERROR: GOOGLE_APPLICATION_CREDENTIALS_JSON is empty or missing!"
-          #   exit 1
-          # fi
-          
-          echo "${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}" > gcp-key.json
-          
-          # Debugging: Ensure the file is not empty
-          echo "First 100 characters of gcp-key.json:"
-          head -c 100 gcp-key.json || echo "ERROR: gcp-key.json is empty!"
-          
           # Authenticate with GCP 
           gcloud auth activate-service-account --key-file=gcp-key.json
           gcloud config set project ${{ secrets.GCP_PROJECT_ID }}
@@ -139,7 +119,7 @@ jobs:
             packer build -var 'aws_access_key=${{ secrets.AWS_ACCESS_KEY_ID }}' -var 'aws_secret_key=${{ secrets.AWS_SECRET_ACCESS_KEY }}' -var 'artifact_path=app_artifact.zip' packer-template.pkr.hcl
           elif [[ "${{ matrix.platform }}" == "gcp" ]]; then
             # Build GCP image
-            packer build -var 'gcp_project_id=csye-dev-451921-452108' -var 'gcp_credentials_file=gcp-key.json' -var 'artifact_path=app_artifact.zip' packer-template.pkr.hcl
+            packer build -var 'gcp_project_id=${{ secrets.GCP_PROJECT_ID }}' -var 'gcp_credentials_file=gcp-key.json' -var 'artifact_path=app_artifact.zip' packer-template.pkr.hcl
 
       - name: Create local user csye6225
         run: |
