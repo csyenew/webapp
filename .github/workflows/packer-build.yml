@@ -127,16 +127,21 @@ jobs:
           PLATFORM: ${{ matrix.platform }}
         run: |
           if [[ "$PLATFORM" == "aws" ]]; then
-            # Build AWS image
-            packer build -var "aws_access_key=${{ secrets.AWS_ACCESS_KEY_ID }}" \
-                         -var "aws_secret_key=${{ secrets.AWS_SECRET_ACCESS_KEY }}" \
-                         -var "artifact_path=app_artifact.zip" packer-template.pkr.hcl
+            echo "Building AWS image..."
+            packer build \
+              -var "aws_access_key=${{ secrets.AWS_ACCESS_KEY_ID }}" \
+              -var "aws_secret_key=${{ secrets.AWS_SECRET_ACCESS_KEY }}" \
+              -var "artifact_path=app_artifact.zip" \
+              packer-template.pkr.hcl
           elif [[ "$PLATFORM" == "gcp" ]]; then
-            # Build GCP image
-            packer build -var "gcp_project_id=${{ secrets.GCP_PROJECT_ID }}" \
-                         -var "gcp_credentials_file=gcp-key.json" \
-                         -var "artifact_path=app_artifact.zip" packer-template.pkr.hcl
+            echo "Building GCP image..."
+            packer build \
+              -var "gcp_project_id=${{ secrets.GCP_PROJECT_ID }}" \
+              -var "gcp_credentials_file=gcp-key.json" \
+              -var "artifact_path=app_artifact.zip" \
+              packer-template.pkr.hcl
           fi
+
 
       - name: Create local user csye6225
         run: |
