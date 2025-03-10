@@ -2,30 +2,54 @@ packer {
   required_version = ">= 1.8.0"
 
   required_plugins {
-  amazon = {
-    source  = "github.com/hashicorp/amazon"
-    version = ">= 1.0.0"
-  }
-  googlecompute = {
-    source  = "github.com/hashicorp/googlecompute"
-    version = ">= 1.0.0"
+    amazon = {
+      source  = "hashicorp/amazon"
+      version = ">= 1.0.0"
+    }
+    googlecompute = {
+      source  = "hashicorp/googlecompute"
+      version = ">= 1.0.0"
+    }
   }
 }
 
-}
- 
 # Define variables for AWS and GCP
+variable "aws_access_key" {
+  type    = string
+  default = ""
+}
+
+variable "aws_secret_key" {
+  type    = string
+  default = ""
+}
+
 variable "aws_region" {
+  type    = string
   default = "us-east-1"
 }
 
 variable "gcp_project_id" {
+  type    = string
   default = "csye-dev-451921-452108"
+}
+
+variable "gcp_credentials_file" {
+  type    = string
+  default = "gcp-key.json"
+}
+
+variable "artifact_path" {
+  type    = string
+  default = "app_artifact.zip"
 }
 
 # AWS Source Configuration
 source "amazon-ebs" "ubuntu_custom_aws" {
   region     = var.aws_region
+  access_key = var.aws_access_key
+  secret_key = var.aws_secret_key
+
   source_ami_filter {
     filters = {
       name                = "ubuntu/images/*ubuntu-jammy-22.04-amd64-server-*"
@@ -45,6 +69,7 @@ source "amazon-ebs" "ubuntu_custom_aws" {
 # GCP Source Configuration
 source "googlecompute" "ubuntu_custom_gcp" {
   project_id          = var.gcp_project_id
+  credentials         = file(var.gcp_credentials_file)
   source_image_family = "ubuntu-2204-lts"
   zone                = "us-central1-a"
   machine_type        = "e2-micro"
@@ -82,22 +107,24 @@ build {
       "sudo -u csye6225 /home/csye6225/webapp/venv/bin/pip install Flask Flask-SQLAlchemy Flask-Migrate python-dotenv mysql-connector-python werkzeug pytest",
 
       # Corrected systemd service file creation
-      "sudo bash -c 'cat > /etc/systemd/system/webapp.service <<EOF\n" +
-      "[Unit]\n" +
-      "Description=Flask Web Application\n" +
-      "After=network.target\n\n" +
-      "[Service]\n" +
-      "User=csye6225\n" +
-      "Group=csye6225\n" +
-      "WorkingDirectory=/home/csye6225/webapp\n" +
-      "ExecStart=/home/csye6225/webapp/venv/bin/python /home/csye6225/webapp/app.py\n" +
-      "Restart=always\n" +
-      "Environment=FLASK_APP=app.py\n" +
-      "Environment=FLASK_ENV=production\n" +
-      "Environment=PATH=/home/csye6225/webapp/venv/bin:$PATH\n\n" +
-      "[Install]\n" +
-      "WantedBy=multi-user.target\n" +
-      "EOF'",
+      "sudo tee /etc/systemd/system/webapp.service <<EOF > /dev/null
+[Unit]
+Description=Flask Web Application
+After=network.target
+
+[Service]
+User=csye6225
+Group=csye6225
+WorkingDirectory=/home/csye6225/webapp
+ExecStart=/home/csye6225/webapp/venv/bin/python /home/csye6225/webapp/app.py
+Restart=always
+Environment=FLASK_APP=app.py
+Environment=FLASK_ENV=production
+Environment=PATH=/home/csye6225/webapp/venv/bin:$PATH
+
+[Install]
+WantedBy=multi-user.target
+EOF",
 
       # Enable and start the service
       "sudo systemctl daemon-reload",
