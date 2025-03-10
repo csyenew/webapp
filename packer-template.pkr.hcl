@@ -2,15 +2,16 @@ packer {
   required_version = ">= 1.8.0"
 
   required_plugins {
-    amazon = {
-      source  = "hashicorp/amazon"
-      version = ">= 1.0.0"
-    }
-    googlecompute = {
-      source  = "hashicorp/googlecompute"
-      version = ">= 1.0.0"
-    }
+  amazon = {
+    source  = "github.com/hashicorp/amazon"
+    version = ">= 1.0.0"
   }
+  googlecompute = {
+    source  = "github.com/hashicorp/googlecompute"
+    version = ">= 1.0.0"
+  }
+}
+
 }
  
 # Define variables for AWS and GCP
