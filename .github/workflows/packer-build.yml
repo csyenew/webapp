@@ -89,15 +89,18 @@ jobs:
             exit 1
           fi
 
-          echo "${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}" > gcp-key.json
+          echo "hello"
+
+
+          # echo "${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}" > gcp-key.json
           
-          # Debugging: Ensure the file is not empty
-          echo "First 100 characters of gcp-key.json:"
-          head -c 100 gcp-key.json || echo "ERROR: gcp-key.json is empty!"
+          # # Debugging: Ensure the file is not empty
+          # echo "First 100 characters of gcp-key.json:"
+          # head -c 100 gcp-key.json || echo "ERROR: gcp-key.json is empty!"
  
-          # Authenticate with GCP 
-          gcloud auth activate-service-account --key-file=gcp-key.json
-          gcloud config set project ${{ secrets.GCP_PROJECT_ID }}
+          # # Authenticate with GCP 
+          # gcloud auth activate-service-account --key-file=gcp-key.json
+          # gcloud config set project ${{ secrets.GCP_PROJECT_ID }}
 
       - name: Authenticate with GCP
         run: |
