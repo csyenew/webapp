@@ -101,6 +101,11 @@ jobs:
 
       - name: Authenticate with GCP
         run: |
+          if [[ -z "${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}" ]]; then
+            echo "ERROR: GOOGLE_APPLICATION_CREDENTIALS_JSON is empty or missing!"
+            exit 1
+          fi
+          
           echo "${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}" > gcp-key.json
           
           # Debugging: Ensure the file is not empty
