@@ -36,36 +36,15 @@ jobs:
         continue-on-error: false
 
   packer-build:
-    needs: [packer-fmt-validate]  # Ensure validation passes before building
+    needs: [packer-fmt-validate]
     runs-on: ubuntu-latest
-    env:
-      AWS_DEFAULT_REGION: us-east-1
     strategy:
       matrix:
-        platform: [aws, gcp]  # Build images for AWS and GCP in parallel
+        provider: [aws, gcp]  # Run AWS & GCP builds in parallel
 
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v2
-
-      - name: Install AWS CLI
-        run: |
-          curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-          unzip awscliv2.zip
-          sudo ./aws/install --update
-          aws --version
-
-      - name: Install GCP CLI
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y google-cloud-cli
-          gcloud --version
-
-      - name: Install MySQL
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y mysql-client
-          mysql --version
 
       - name: Install Packer
         run: |
@@ -76,51 +55,58 @@ jobs:
           sudo mv packer /usr/local/bin/
           packer --version  # Verify installation
 
-      - name: Configure AWS CLI
-        if: matrix.platform == 'aws'
+      - name: Install AWS CLI (if building AWS)
+        if: matrix.provider == 'aws'
+        run: |
+          curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+          unzip awscliv2.zip
+          sudo ./aws/install --update
+          aws --version
+
+      - name: Install GCP CLI (if building GCP)
+        if: matrix.provider == 'gcp'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y google-cloud-cli
+          gcloud --version
+
+      - name: Configure AWS CLI (if building AWS)
+        if: matrix.provider == 'aws'
         run: |
           mkdir -p ~/.aws
           echo "[default]" > ~/.aws/credentials
-          echo "[default]" > ~/.aws/config
           echo "aws_access_key_id=${{ secrets.AWS_ACCESS_KEY_ID }}" >> ~/.aws/credentials
           echo "aws_secret_access_key=${{ secrets.AWS_SECRET_ACCESS_KEY }}" >> ~/.aws/credentials
+          echo "[default]" > ~/.aws/config
           echo "region=us-east-1" >> ~/.aws/config
 
-      - name: Decode and Store GCP Credentials
-        if: matrix.platform == 'gcp'
+      - name: Decode and Store GCP Credentials (if building GCP)
+        if: matrix.provider == 'gcp'
         env:
           GOOGLE_APPLICATION_CREDENTIALS_JSON: ${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}
         run: |
-          echo "Decoding GCP credentials..."
-
-          if [[ -z "$GOOGLE_APPLICATION_CREDENTIALS_JSON" ]]; then
-            echo "ERROR: GOOGLE_APPLICATION_CREDENTIALS_JSON is empty!"
-            exit 1
-          fi
-
           echo "$GOOGLE_APPLICATION_CREDENTIALS_JSON" | base64 --decode > $HOME/gcp-key.json
+          export GOOGLE_APPLICATION_CREDENTIALS="$HOME/gcp-key.json"
           echo "GOOGLE_APPLICATION_CREDENTIALS=$HOME/gcp-key.json" >> $GITHUB_ENV
-
-          ls -l $HOME/gcp-key.json || echo "gcp-key.json NOT FOUND!"
-          cat $HOME/gcp-key.json | jq . || echo "Invalid JSON!"
-
           gcloud auth activate-service-account --key-file=$HOME/gcp-key.json
           gcloud config set project "$(jq -r '.project_id' $HOME/gcp-key.json)"
 
-      - name: Build Application Artifact
+      - name: Verify GCP Authentication (if building GCP)
+        if: matrix.provider == 'gcp'
         run: |
-          tar -czvf app_artifact.tar.gz app.py config.py packer-template.pkr.hcl requirements.txt webapp.service
-          echo "Artifact built successfully"
+          gcloud auth list
+          gcloud compute instances list --limit=5 || echo "Unable to list instances (might be a permissions issue)"
 
       - name: Run Packer Init
         run: packer init .
 
       - name: Build AWS & GCP Images with Packer
         env:
-          AWS_PROFILE: default
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        run: packer build .
+          GOOGLE_APPLICATION_CREDENTIALS: $HOME/gcp-key.json
+        run: |
+          packer build -only="source.${{ matrix.provider }}-*"
 
   update-launch-template:
     name: Update Launch Template
@@ -130,7 +116,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v2
 
-      - name: Retrieve Latest AMI ID
+      - name: Retrieve Latest AMI ID (for AWS)
         run: |
           LATEST_AMI_ID=$(aws ec2 describe-images --owners self --query 'Images[*].[ImageId]' --output text | tail -n1)
           echo "Latest AMI: $LATEST_AMI_ID"
