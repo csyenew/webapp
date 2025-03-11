@@ -81,14 +81,16 @@ locals {
 
 # AWS Source Configuration
 source "amazon-ebs" "ubuntu_custom_aws" {
-  region        = var.region
-  ami_name      = "${var.ami_name}-${local.timestamp}"
-  ami_users     = var.ami_users
-  instance_type = var.instance_type
-  source_ami    = var.source_ami
-  ssh_username  = var.ssh_username
-  subnet_id     = var.subnet_id
-  vpc_id        = var.vpc_id
+  region             = var.region
+  ami_name           = "${var.ami_name}-${local.timestamp}"
+  ami_users          = var.ami_users
+  instance_type      = var.instance_type
+  source_ami        = var.source_ami
+  ssh_username      = var.ssh_username
+  ssh_keypair_name  = "packer-key"   # Use the correct static key pair
+  ssh_private_key_file = "~/.ssh/packer-key.pem"  # Ensure the key exists
+  subnet_id        = var.subnet_id
+  vpc_id           = var.vpc_id
 
   encrypt_boot = false
 
@@ -102,6 +104,7 @@ source "amazon-ebs" "ubuntu_custom_aws" {
     delete_on_termination = true
   }
 }
+
 
 # GCP Source Configuration
 source "googlecompute" "ubuntu_custom_gcp" {
@@ -172,10 +175,14 @@ build {
 
   # Enable and start the service
   provisioner "shell" {
-    inline = [
-      "sudo systemctl daemon-reload",
-      "sudo systemctl enable webapp",
-      "sudo systemctl start webapp"
-    ]
-  }
+  inline = [
+    "export DEBIAN_FRONTEND=noninteractive",
+    "sudo apt-get update -y && sudo apt-get upgrade -y",
+    "sudo apt-get install -y --fix-missing mecab-ipadic-utf8 python3-venv mysql-server mysql-client python3-pip",
+    "sudo apt-get install -f -y",  # Fix any missing dependencies
+    "sudo apt-get autoremove -y",  # Clean up unused packages
+    "sudo apt-get clean"
+  ]
+}
+
 }
