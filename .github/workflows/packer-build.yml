@@ -86,7 +86,7 @@ jobs:
           # Decode and store credentials
           echo "$GOOGLE_APPLICATION_CREDENTIALS_JSON" | base64 --decode > "$HOME/gcp-key.json"
 
-          # Validate JSON file exists
+          # Ensure file exists
           if [[ ! -f "$HOME/gcp-key.json" ]]; then
             echo "❌ ERROR: Credentials file not found at $HOME/gcp-key.json"
             exit 1
