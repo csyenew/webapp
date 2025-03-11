@@ -26,7 +26,7 @@ variable "region" {
 
 variable "source_ami" {
   type    = string
-  default = "ami-06db4d78cb1d3bbf9"
+  default = "ami-06db4d78cb1d3bbf9"  # Ubuntu AMI
 }
 
 variable "instance_type" {
@@ -36,7 +36,7 @@ variable "instance_type" {
 
 variable "ssh_username" {
   type    = string
-  default = "admin"
+  default = "admin"  # Confirmed username for Ubuntu AMIs
 }
 
 variable "subnet_id" {
@@ -103,110 +103,36 @@ source "amazon-ebs" "ubuntu_custom_aws" {
   }
 }
 
-# GCP Source Configuration
-source "googlecompute" "ubuntu_custom_gcp" {
-  project_id          = var.gcp_project_id
-  source_image_family = "ubuntu-2204-lts"
-  zone                = "us-central1-a"
-  machine_type        = "e2-micro"
-  image_name          = "custom-ubuntu-24-${local.timestamp}"
-  image_family        = "custom-ubuntu"
-  image_description   = "Custom Ubuntu 24.04 LTS with MySQL and Flask"
-  ssh_username        = "ubuntu"
-}
-
 # Build Configuration
 build {
   sources = [
-    "source.amazon-ebs.ubuntu_custom_aws",
-    "source.googlecompute.ubuntu_custom_gcp"
+    "source.amazon-ebs.ubuntu_custom_aws"
   ]
-
-  # Remove broken MySQL dependencies & fix package manager issues
-  provisioner "shell" {
-    inline = [
-      "export DEBIAN_FRONTEND=noninteractive",
-
-      # Remove any existing MySQL packages
-      "sudo apt-get remove --purge mysql-server mysql-client mysql-common mysql-server-core-* mysql-client-core-* -y",
-      "sudo rm -rf /var/lib/mysql /etc/mysql",
-
-      # Reset APT package lists and fix dependencies
-      "sudo apt-get clean",
-      "sudo rm -rf /var/lib/apt/lists/\\*",
-      "sudo apt-get update -y",
-      "sudo apt-get upgrade -y",
-      "sudo apt-get install -f -y",
-      "sudo dpkg --configure -a",
-
-      # Enable universe repository (required for some packages)
-      "sudo add-apt-repository universe -y",
-      "sudo apt-get update -y"
-    ]
-  }
 
   # Install MySQL 8.0 from Ubuntu’s official repository
   provisioner "shell" {
     inline = [
       "export DEBIAN_FRONTEND=noninteractive",
 
-      # Install MySQL from Ubuntu’s repository
+      # Ensure Universe Repository is Enabled
+      "sudo add-apt-repository universe -y",
+      "sudo apt-get update -y",
+
+      # Install MySQL
       "sudo apt-get install -y mysql-server mysql-client",
 
       # Ensure MySQL starts properly
       "sudo systemctl enable mysql",
-      "sudo systemctl start mysql",
-
-      # Secure MySQL installation (set root password)
-      "sudo mysql -e \"ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY 'root';\"",
-      "sudo mysql -e \"FLUSH PRIVILEGES;\""
+      "sudo systemctl start mysql"
     ]
   }
 
-  # Install Python 3 and required dependencies
+  # Secure MySQL installation
   provisioner "shell" {
     inline = [
       "export DEBIAN_FRONTEND=noninteractive",
-      
-      # Install correct Python version
-      "sudo apt-get install -y python3 python3-pip python3-venv",
-
-      # Verify installation
-      "python3 --version",
-      "pip3 --version"
-    ]
-  }
-
-  # Create systemd service for Flask app
-  provisioner "shell" {
-    inline = [
-      "cat <<EOF | sudo tee /etc/systemd/system/webapp.service",
-      "[Unit]",
-      "Description=Flask Web Application",
-      "After=network.target",
-      "",
-      "[Service]",
-      "User=csye6225",
-      "Group=csye6225",
-      "WorkingDirectory=/home/csye6225/webapp",
-      "ExecStart=/home/csye6225/webapp/venv/bin/python /home/csye6225/webapp/app.py",
-      "Restart=always",
-      "Environment=FLASK_APP=app.py",
-      "Environment=FLASK_ENV=production",
-      "Environment=PATH=/home/csye6225/webapp/venv/bin:$PATH",
-      "",
-      "[Install]",
-      "WantedBy=multi-user.target",
-      "EOF"
-    ]
-  }
-
-  # Enable and start Flask service
-  provisioner "shell" {
-    inline = [
-      "sudo systemctl daemon-reload",
-      "sudo systemctl enable webapp.service",
-      "sudo systemctl start webapp.service"
+      "sudo mysql -e \"ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY 'root';\"",
+      "sudo mysql -e \"FLUSH PRIVILEGES;\""
     ]
   }
 
