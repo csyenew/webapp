@@ -122,30 +122,40 @@ build {
     "source.googlecompute.ubuntu_custom_gcp"
   ]
 
+  # Provisioning step to install system dependencies, fix MySQL installation issues
   provisioner "shell" {
     inline = [
       "export DEBIAN_FRONTEND=noninteractive",
-      "sudo apt-get update -y && sudo apt-get upgrade -y",
+      "sudo apt-get update -y",
+      "sudo apt-get upgrade -y",
 
-      # Fix for MySQL dependency issues
-      "sudo apt-get install -y software-properties-common gnupg",
-      "sudo add-apt-repository universe -y",
+      # Ensure non-interactive package installation
+      "sudo apt-get install -yq software-properties-common gnupg",
+
+      # Add MySQL repository manually
       "wget https://dev.mysql.com/get/mysql-apt-config_0.8.20-1_all.deb",
-      "sudo dpkg -i mysql-apt-config_0.8.20-1_all.deb",
+      "sudo DEBIAN_FRONTEND=noninteractive dpkg -i mysql-apt-config_0.8.20-1_all.deb",
       "sudo apt-get update -y",
 
-      # Install MySQL with dependencies
-      "sudo apt-get install -y mysql-server mysql-client python3-pip python3-venv",
+      # Preconfigure MySQL root password
+      "echo 'mysql-server mysql-server/root_password password root' | sudo debconf-set-selections",
+      "echo 'mysql-server mysql-server/root_password_again password root' | sudo debconf-set-selections",
 
-      # Enable and start MySQL service
+      # Install MySQL Server & Client
+      "sudo apt-get install -yq mysql-server mysql-client python3-pip python3-venv",
+
+      # Fix for MySQL installation issues
+      "sudo apt-get install -f -y", 
+
+      # Ensure MySQL starts properly
       "sudo systemctl enable mysql",
       "sudo systemctl start mysql",
 
-      # Create user
+      # Create user for Flask app
       "sudo groupadd csye6225 || true",
       "sudo useradd -r -m -s /usr/sbin/nologin -g csye6225 csye6225 || true",
 
-      # Setup Flask App
+      # Setup Flask App directory
       "sudo mkdir -p /home/csye6225/webapp",
       "sudo chown -R csye6225:csye6225 /home/csye6225/webapp",
       "sudo -u csye6225 python3 -m venv /home/csye6225/webapp/venv",
@@ -186,12 +196,9 @@ build {
     ]
   }
 
-  # Fix broken packages and clean up
+  # Cleanup provisioner
   provisioner "shell" {
     inline = [
-      "sudo apt-get install -f -y",  # Fix any missing dependencies
-      "sudo apt-mark unhold mysql-common",
-      "sudo apt-mark unhold mysql-server-core-8.0",
       "sudo apt-get autoremove -y",
       "sudo apt-get clean"
     ]
