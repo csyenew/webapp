@@ -35,7 +35,7 @@ jobs:
         continue-on-error: false
 
   packer-build:
-    needs: [packer-fmt-validate]  # Ensure validation passes before building
+    needs: [packer-format-validate]  # Ensure validation passes before building
     runs-on: ubuntu-latest
     env:
       AWS_DEFAULT_REGION: us-east-1
