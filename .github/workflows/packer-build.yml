@@ -86,13 +86,23 @@ jobs:
           # Decode and store credentials
           echo "$GOOGLE_APPLICATION_CREDENTIALS_JSON" | base64 --decode > "$HOME/gcp-key.json"
 
-          # Validate JSON
+          # Validate JSON file exists
+          if [[ ! -f "$HOME/gcp-key.json" ]]; then
+            echo "❌ ERROR: Credentials file not found at $HOME/gcp-key.json"
+            exit 1
+          fi
+
+          # Validate JSON structure
           if ! jq empty "$HOME/gcp-key.json" >/dev/null 2>&1; then
             echo "❌ ERROR: Invalid JSON in gcp-key.json!"
             exit 1
           fi
 
-          # Set the correct path
+          echo "✅ GCP credentials stored successfully at: $HOME/gcp-key.json"
+          
+          ls -l "$HOME/gcp-key.json"
+
+          # Set the environment variable for future steps
           echo "GOOGLE_APPLICATION_CREDENTIALS=$HOME/gcp-key.json" >> $GITHUB_ENV
 
 
@@ -120,8 +130,13 @@ jobs:
       - name: Build AWS & GCP Images with Packer
         env:
           AWS_PROFILE: default
-          GOOGLE_APPLICATION_CREDENTIALS: $HOME/gcp-key.json
-        run: packer build .
+          GOOGLE_APPLICATION_CREDENTIALS: $HOME/gcp-key.json  # Ensure correct path
+        run: |
+          if [[ ! -f "$GOOGLE_APPLICATION_CREDENTIALS" ]]; then
+            echo "❌ ERROR: GOOGLE_APPLICATION_CREDENTIALS file not found!"
+            exit 1
+          fi
+          packer build .
 
   update-launch-template:
     name: Update Launch Template
