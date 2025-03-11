@@ -90,7 +90,8 @@ source "amazon-ebs" "ubuntu_custom_aws" {
   subnet_id     = var.subnet_id
   vpc_id        = var.vpc_id
 
-  encrypt_boot  = false  # ✅ FIX: Disable encryption to allow sharing
+  encrypt_boot = false
+  
 
   tags = {
     Name        = "${var.ami_name}-${local.timestamp}"
