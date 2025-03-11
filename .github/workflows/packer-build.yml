@@ -21,7 +21,7 @@ jobs:
         ports:
           - 3306:3306
         options: >-
-          --health-cmd="mysqladmin ping -h localhost"
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -u${{ secrets.DB_USER }} -p${{ secrets.DB_PASSWORD }}"
           --health-interval=10s
           --health-timeout=5s
           --health-retries=3
@@ -32,18 +32,19 @@ jobs:
       DB_NAME: ${{ secrets.DB_NAME }}
       DB_USER: ${{ secrets.DB_USER }}
       DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+      AWS_REGION: us-east-1
 
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v3
 
-      ## ✅ Configure AWS Credentials
+      ## ✅ Configure AWS Credentials (Force us-east-1)
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v2
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_REGION }}
+          aws-region: us-east-1
 
       ## ✅ Authenticate with Google Cloud
       - name: Authenticate with Google Cloud
@@ -125,6 +126,7 @@ jobs:
         run: |
           echo "Using app_artifact_path=build/"
           echo "Google Cloud project: $(jq -r '.project_id' <<< '${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}')"
+          echo "AWS Region: us-east-1"
 
       ## ✅ Ensure GCP Credentials Exist Before Packer Build
       - name: Ensure GCP Credentials Exist Before Packer Build
@@ -135,10 +137,11 @@ jobs:
           fi
           echo "✅ GCP credentials ready for Packer."
 
-      ## ✅ Build Packer Image for AWS & GCP
+      ## ✅ Build Packer Image for AWS & GCP (Force AWS Region us-east-1)
       - name: Build Packer Image for AWS & GCP
         run: |
           packer build \
           -var "app_artifact_path=build/" \
+          -var "aws_region=us-east-1" \
           -var "gcp_project=$(jq -r '.project_id' <<< '${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}')" \
           ubuntu-custom.pkr.hcl
