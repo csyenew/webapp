@@ -122,9 +122,9 @@ build {
 ]
   }
 
-    provisioner "shell" {
-    inline = <<EOF
-      sudo bash -c 'cat > /etc/systemd/system/webapp.service <<EOL
+    # Create systemd service for Flask app using a script file
+  provisioner "file" {
+    content = <<EOF
 [Unit]
 Description=Flask Web Application
 After=network.target
@@ -141,12 +141,17 @@ Environment="PATH=/home/csye6225/webapp/venv/bin:$PATH"
 
 [Install]
 WantedBy=multi-user.target
-EOL'
-
-      # Reload systemd, enable and start Flask service
-      sudo systemctl daemon-reload
-      sudo systemctl enable webapp
-      sudo systemctl start webapp
 EOF
+    destination = "/tmp/webapp.service"
+  }
+
+  provisioner "shell" {
+    inline = [
+      "sudo mv /tmp/webapp.service /etc/systemd/system/webapp.service",
+      "sudo chmod 644 /etc/systemd/system/webapp.service",
+      "sudo systemctl daemon-reload",
+      "sudo systemctl enable webapp",
+      "sudo systemctl start webapp"
+    ]
   }
 }
