@@ -41,13 +41,12 @@ variable "ssh_username" {
 
 variable "subnet_id" {
   type    = string
-  default = "subnet-0d0c161f44f4f4ae8"  # ✅ Replace with a valid subnet
+  default = "subnet-0d0c161f44f4f4ae8"
 }
-
 
 variable "vpc_id" {
   type    = string
-  default = "vpc-0f93b32042daa6131"
+  default = "vpc-0edcd255c0595a650"
 }
 
 variable "ami_name" {
@@ -92,7 +91,6 @@ source "amazon-ebs" "ubuntu_custom_aws" {
   vpc_id        = var.vpc_id
 
   encrypt_boot = false
-  
 
   tags = {
     Name        = "${var.ami_name}-${local.timestamp}"
@@ -105,18 +103,19 @@ source "amazon-ebs" "ubuntu_custom_aws" {
   }
 }
 
-
 # GCP Source Configuration
 source "googlecompute" "ubuntu_custom_gcp" {
   project_id          = var.gcp_project_id
   source_image_family = "ubuntu-2204-lts"
   zone                = "us-central1-a"
   machine_type        = "e2-micro"
-  image_name          = "custom-ubuntu-24-{{timestamp}}"
+  image_name          = "custom-ubuntu-24-${local.timestamp}"
   image_family        = "custom-ubuntu"
   image_description   = "Custom Ubuntu 24.04 LTS with MySQL and Flask"
   ssh_username        = "ubuntu"
 }
+
+
 
 # Build Configuration
 build {
@@ -180,4 +179,3 @@ build {
     ]
   }
 }
- 
