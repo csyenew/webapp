@@ -104,6 +104,18 @@ jobs:
       #     gcloud auth activate-service-account --key-file=gcp-key.json
       #     gcloud config set project "$GCP_PROJECT_ID"
 
+      - name: Decode and Store GCP Credentials
+        if: matrix.platform == 'gcp'
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS_JSON: ${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}
+          GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+        run: |
+          echo "$GOOGLE_APPLICATION_CREDENTIALS_JSON" > gcp-key.json
+          export GOOGLE_APPLICATION_CREDENTIALS=gcp-key.json
+          gcloud auth activate-service-account --key-file=gcp-key.json
+          gcloud config set project "$GCP_PROJECT_ID"
+
+       
       - name: Build Application Artifact
         run: |
           zip -r app_artifact.zip app.py config.py packer-template.pkr.hcl requirements.txt webapp.service
