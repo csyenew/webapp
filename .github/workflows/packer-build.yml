@@ -132,6 +132,11 @@ jobs:
           zip -r app_artifact.zip app.py webapp.service
           echo "Artifact built successfully"
 
+      - name: Run packer init
+        run: |
+          packer init .
+        continue-on-error: false
+
       - name: Build Custom Image for ${{ matrix.platform }}
         env:
           PLATFORM: ${{ matrix.platform }}
