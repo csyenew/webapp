@@ -1,19 +1,16 @@
 name: Packer CI
 
 on:
-  pull_request:
-    types: [opened, synchronize, reopened, closed]
-    branches:
-      - main
   push:
     branches:
       - main
+    types:
+      - merged
+ 
 
 jobs:
-  packer-fmt-validate:
-    if: github.event_name == 'pull_request' && github.event.action != 'closed'
+  packer-format-validate:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
@@ -21,160 +18,115 @@ jobs:
       - name: Install Packer
         run: |
           sudo apt-get update
-          sudo apt-get install -y gnupg software-properties-common
-          curl -fsSL https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
-          echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
-          sudo apt-get update
-          sudo apt-get install -y packer
+          sudo apt-get install -y gnupg software-properties-common wget unzip
+          wget https://releases.hashicorp.com/packer/1.8.0/packer_1.8.0_linux_amd64.zip
+          unzip packer_1.8.0_linux_amd64.zip
+          sudo mv packer /usr/local/bin/
           packer --version  # Verify installation
 
-      - name: Run packer fmt
-        run: |
-          packer fmt -check -diff .
+      - name: Run Packer Init
+        run: packer init .
+
+      - name: Run Packer Formatting Check
+        run: packer fmt .
         continue-on-error: false
 
-      - name: Run packer validate
-        run: |
-          packer validate .
+      - name: Run Packer Validate
+        run: packer validate .
         continue-on-error: false
 
-  build:
-    if: github.event.pull_request.merged == true || github.event_name == 'push'
+  packer-build:
+    needs: [packer-fmt-validate]  # Ensure validation passes before building
     runs-on: ubuntu-latest
+    env:
+      AWS_DEFAULT_REGION: us-east-1
     strategy:
       matrix:
-        platform: [aws, gcp]
+        platform: [aws, gcp]  # Build images for AWS and GCP in parallel
 
     steps:
-      - name: Checkout code
+      - name: Checkout Repository
         uses: actions/checkout@v2
-
-      - name: Install Packer
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y gnupg software-properties-common
-          curl -fsSL https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
-          echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
-          sudo apt-get update
-          sudo apt-get install -y packer
-          packer --version  # Verify installation
 
       - name: Install AWS CLI
         run: |
           curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
           unzip awscliv2.zip
           sudo ./aws/install --update
-          aws --version  # Verify installation
-
-      - name: Configure AWS CLI
-        run: |
-          mkdir -p ~/.aws
-          echo "[default]" > ~/.aws/config
-          echo "aws_access_key_id=${{ secrets.AWS_ACCESS_KEY_ID }}" >> ~/.aws/credentials
-          echo "aws_secret_access_key=${{ secrets.AWS_SECRET_ACCESS_KEY }}" >> ~/.aws/credentials
-          echo "region=${{ secrets.AWS_REGION }}" >> ~/.aws/config
+          aws --version
 
       - name: Install GCP CLI
         run: |
-          sudo apt-get update && sudo apt-get install -y curl gnupg
-          echo "deb [signed-by=/usr/share/keyrings/cloud.google.com-archive-keyring.gpg] https://packages.cloud.google.com/apt cloud-sdk main" | sudo tee -a /etc/apt/sources.list.d/google-cloud-sdk.list
-          curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo tee /usr/share/keyrings/cloud.google.com-archive-keyring.gpg
-          sudo apt-get update && sudo apt-get install google-cloud-sdk
-          gcloud --version  # Verify installation
+          sudo apt-get update
+          sudo apt-get install -y google-cloud-cli
+          gcloud --version
+
+      - name: Install MySQL
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y mysql-client
+          mysql --version
+
+      - name: Install Packer
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gnupg software-properties-common wget unzip
+          wget https://releases.hashicorp.com/packer/1.8.0/packer_1.8.0_linux_amd64.zip
+          unzip packer_1.8.0_linux_amd64.zip
+          sudo mv packer /usr/local/bin/
+          packer --version  # Verify installation
+
+      - name: Configure AWS CLI
+        if: matrix.platform == 'aws'
+        run: |
+          mkdir -p ~/.aws
+          echo "[default]" > ~/.aws/credentials
+          echo "[default]" > ~/.aws/config
+          echo "aws_access_key_id=${{ secrets.AWS_ACCESS_KEY_ID }}" >> ~/.aws/credentials
+          echo "aws_secret_access_key=${{ secrets.AWS_SECRET_ACCESS_KEY }}" >> ~/.aws/credentials
+          echo "region=us-east-1" >> ~/.aws/config
 
       - name: Decode and Store GCP Credentials
+        if: matrix.platform == 'gcp'
         env:
           GOOGLE_APPLICATION_CREDENTIALS_JSON: ${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}
-          GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
         run: |
+          echo "Decoding GCP credentials..."
+
           if [[ -z "$GOOGLE_APPLICATION_CREDENTIALS_JSON" ]]; then
-            echo "ERROR: GOOGLE_APPLICATION_CREDENTIALS_JSON is empty or missing!"
+            echo "ERROR: GOOGLE_APPLICATION_CREDENTIALS_JSON is empty!"
             exit 1
           fi
 
-          if [[ -z "$GCP_PROJECT_ID" ]]; then
-            echo "ERROR: GCP_PROJECT_ID is empty or missing!"
-            exit 1
-          fi
+          echo "$GOOGLE_APPLICATION_CREDENTIALS_JSON" | base64 --decode > $HOME/gcp-key.json
+          echo "GOOGLE_APPLICATION_CREDENTIALS=$HOME/gcp-key.json" >> $GITHUB_ENV
 
-          echo "$GOOGLE_APPLICATION_CREDENTIALS_JSON" > gcp-key.json
-          
-          # Debugging: Ensure the file is not empty
-          echo "First 100 characters of gcp-key.json:"
-          head -c 100 gcp-key.json || echo "ERROR: gcp-key.json is empty!"
- 
-          # Authenticate with GCP 
-          gcloud auth activate-service-account --key-file=gcp-key.json
-          gcloud config set project "$GCP_PROJECT_ID"
-        shell: bash
+          ls -l $HOME/gcp-key.json || echo "gcp-key.json NOT FOUND!"
+          cat $HOME/gcp-key.json | jq . || echo "Invalid JSON!"
 
-
-
-      - name: Run Integration Tests
-        run: |
-          # Add your integration test commands here
-          echo "Running integration tests..."
-          # Example: ./run-integration-tests.sh
+          gcloud auth activate-service-account --key-file=$HOME/gcp-key.json
+          gcloud config set project "$(jq -r '.project_id' $HOME/gcp-key.json)"
 
       - name: Build Application Artifact
         run: |
-          # Build your application artifact (e.g., war, jar, zip, etc.)
-          zip -r app_artifact.zip app.py webapp.service
+          tar -czvf app_artifact.tar.gz app.py config.py packer-template.pkr.hcl requirements.txt webapp.service
           echo "Artifact built successfully"
 
-      - name: Build Custom Image for ${{ matrix.platform }}
+      - name: Run Packer Init
+        run: packer init .
+
+      - name: Build AWS Image with Packer
+        if: matrix.platform == 'aws'
         env:
-          PLATFORM: ${{ matrix.platform }}
-        run: |
-          if [[ "$PLATFORM" == "aws" ]]; then
-            echo "Building AWS image..."
-            packer build \
-              -var "aws_access_key=${{ secrets.AWS_ACCESS_KEY_ID }}" \
-              -var "aws_secret_key=${{ secrets.AWS_SECRET_ACCESS_KEY }}" \
-              -var "artifact_path=app_artifact.zip" \
-              packer-template.pkr.hcl
-          elif [[ "$PLATFORM" == "gcp" ]]; then
-            echo "Building GCP image..."
-            packer build \
-              -var "gcp_project_id=${{ secrets.GCP_PROJECT_ID }}" \
-              -var "gcp_credentials_file=gcp-key.json" \
-              -var "artifact_path=app_artifact.zip" \
-              packer-template.pkr.hcl
-          fi
+          AWS_PROFILE: default
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        run: packer build -only=amazon-ebs.ubuntu_custom_aws .
 
+      - name: Build GCP Image with Packer
+        if: matrix.platform == 'gcp'
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: /home/runner/gcp-key.json
+        run: packer build -only=googlecompute.ubuntu_custom_gcp .
 
-      - name: Create local user csye6225
-        run: |
-          sudo useradd -r -s /usr/sbin/nologin -g csye6225 csye6225
-
-      - name: Install application dependencies and setup application
-        run: |
-          # Install dependencies and copy application artifacts
-          sudo mkdir -p /home/csye6225/webapp
-          sudo unzip app_artifact.zip -d /home/csye6225/webapp
-          sudo chown -R csye6225:csye6225 /home/csye6225/webapp
-
-      - name: Add systemd service file
-        run: |
-          sudo cp /home/csye6225/webapp/webapp.service /etc/systemd/system/
-          sudo systemctl daemon-reload
-          sudo systemctl enable webapp.service
-
-  update-launch-template:
-    name: Update Launch Template
-    runs-on: ubuntu-latest
-    needs: [build]
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
-
-      - name: Create new Launch Template version
-        run: |
-          aws ec2 create-launch-template-version --launch-template-name asg_launch_config \
-            --launch-template-data "ImageId=${{ env.latest_ami }}" \
-            --source-version ${{ env.version_number }}
-
-      - name: Start AWS Auto Scaling Group Refresh
-        run: | 
-          aws autoscaling start-instance-refresh --auto-scaling-group-name csye6225-asg-spring2023 --strategy Rolling \
-            --desired-configuration '{"LaunchTemplate": {"LaunchTemplateName":"asg_launch_config", "Version":"$Latest"}}'
+ 
