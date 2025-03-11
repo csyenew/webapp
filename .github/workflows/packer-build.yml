@@ -40,7 +40,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        platform: [aws, gcp]  # Build images for AWS and GCP in parallel
+        platform: [aws, gcp]
 
     steps:
       - name: Checkout Repository
@@ -55,7 +55,7 @@ jobs:
           sudo mv packer /usr/local/bin/
           packer --version  # Verify installation
 
-      # ✅ Configure AWS CLI for AWS builds
+      # ✅ Configure AWS CLI
       - name: Configure AWS CLI
         if: matrix.platform == 'aws'
         run: |
@@ -66,7 +66,7 @@ jobs:
           echo "[default]" > ~/.aws/config
           echo "region=us-east-1" >> ~/.aws/config
 
-      # ✅ Store and Validate GCP Credentials
+      # ✅ Store & Validate GCP Credentials
       - name: Store GCP Credentials
         if: matrix.platform == 'gcp'
         run: |
@@ -75,35 +75,37 @@ jobs:
             exit 1
           fi
 
-          echo '${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}' > $HOME/gcp-key.json
+          # Use printf instead of echo to prevent formatting issues
+          printf '%s' '${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}' > $HOME/gcp-key.json
 
+          # Ensure the file exists
           if [[ ! -f "$HOME/gcp-key.json" ]]; then
             echo "❌ ERROR: gcp-key.json file was not created!"
             exit 1
           fi
 
+          # Validate JSON format
           if ! jq empty "$HOME/gcp-key.json" > /dev/null 2>&1; then
             echo "❌ ERROR: Invalid JSON in gcp-key.json!"
+            cat $HOME/gcp-key.json  # Print the file to debug issues
             exit 1
           fi
 
+          # Set environment variable for later steps
           echo "GOOGLE_APPLICATION_CREDENTIALS=$HOME/gcp-key.json" >> $GITHUB_ENV
           echo "✅ GCP credentials stored successfully."
 
-      # ✅ Debug GCP Credentials File Before Packer
+      # ✅ Debug GCP Credentials File
       - name: Debug GCP Credentials File
         if: matrix.platform == 'gcp'
         run: |
           echo "🔍 Checking GOOGLE_APPLICATION_CREDENTIALS variable..."
-          echo "GOOGLE_APPLICATION_CREDENTIALS: $GOOGLE_APPLICATION_CREDENTIALS"
-          
-          echo "🔍 Listing stored key file..."
           ls -l $HOME/gcp-key.json || echo "❌ gcp-key.json not found!"
           
           echo "🔍 First 100 characters of key file:"
           head -c 100 $HOME/gcp-key.json || echo "❌ gcp-key.json is empty!"
           
-          echo "🔍 Validating JSON format..."
+          echo "🔍 Full JSON content:"
           cat $HOME/gcp-key.json | jq . || echo "❌ Invalid JSON!"
 
       # ✅ Build the Application Artifact
@@ -136,7 +138,7 @@ jobs:
             exit 1
           fi
           packer build .
-      
+
   update-launch-template:
     name: Update Launch Template
     runs-on: ubuntu-latest
