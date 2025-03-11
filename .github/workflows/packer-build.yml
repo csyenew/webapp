@@ -83,20 +83,25 @@ jobs:
             exit 1
           fi
 
-          # Decode and save credentials to a file
+          # Decode and store credentials as a file
           echo "$GOOGLE_APPLICATION_CREDENTIALS_JSON" | base64 --decode > "$HOME/gcp-key.json"
 
-          # Set the environment variable to the file path
-          echo "GOOGLE_APPLICATION_CREDENTIALS=$HOME/gcp-key.json" >> $GITHUB_ENV
+          # Ensure the file is properly stored
+          ls -l "$HOME/gcp-key.json" || echo "❌ gcp-key.json NOT FOUND!"
 
-          echo "✅ GCP credentials saved to: $HOME/gcp-key.json"
-
-          # Verify JSON validity
+          # Validate JSON format
           cat "$HOME/gcp-key.json" | jq . || echo "❌ Invalid JSON!"
 
+          # Set the environment variable to use the credentials file
+          echo "GOOGLE_APPLICATION_CREDENTIALS=$HOME/gcp-key.json" >> $GITHUB_ENV
+          export GOOGLE_APPLICATION_CREDENTIALS="$HOME/gcp-key.json"
+
+          echo "✅ GCP credentials successfully stored at: $GOOGLE_APPLICATION_CREDENTIALS"
+
           # Authenticate with GCP
-          gcloud auth activate-service-account --key-file="$HOME/gcp-key.json"
-          gcloud config set project "$(jq -r '.project_id' $HOME/gcp-key.json)"
+          gcloud auth activate-service-account --key-file="$GOOGLE_APPLICATION_CREDENTIALS"
+          gcloud config set project "$(jq -r '.project_id' $GOOGLE_APPLICATION_CREDENTIALS)"
+
 
       - name: Debug GCP Authentication Before Packer
         if: matrix.platform == 'gcp'
