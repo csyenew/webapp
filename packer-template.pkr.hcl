@@ -122,40 +122,39 @@ build {
     "source.googlecompute.ubuntu_custom_gcp"
   ]
 
-  # Install MySQL 8.0 from Ubuntu’s official repository (Only for AWS)
   provisioner "shell" {
-    only = ["amazon-ebs.ubuntu_custom_aws"]  # Run only for AWS builds
     inline = [
+      # Set non-interactive mode to avoid prompts
+      "echo 'export DEBIAN_FRONTEND=noninteractive' | sudo tee -a /etc/environment",
       "export DEBIAN_FRONTEND=noninteractive",
 
-      # Ensure necessary packages are installed
-      "sudo apt-get update -y",
-      "sudo apt-get install -y software-properties-common",
-
-      # Ensure Universe Repository is Enabled
-      "sudo add-apt-repository universe -y",
+      # Update package lists
       "sudo apt-get update -y",
 
-      # Install MySQL
+      # Install necessary dependencies
+      "sudo apt-get install -y wget lsb-release gnupg",
+
+      # Import MySQL GPG Key (Fixes missing key issue)
+      "wget -qO - https://repo.mysql.com/RPM-GPG-KEY-mysql | sudo apt-key add -",
+
+      # Download and install MySQL APT repository package
+      "wget https://dev.mysql.com/get/mysql-apt-config_0.8.22-1_all.deb",
+      "sudo dpkg -i mysql-apt-config_0.8.22-1_all.deb",
+      "sudo apt-get update -y",
+
+      # Install MySQL Server & Client
       "sudo apt-get install -y mysql-server mysql-client",
 
-      # Ensure MySQL starts properly
+      # Start MySQL service
       "sudo systemctl enable mysql",
-      "sudo systemctl start mysql"
+      "sudo systemctl start mysql",
+
+      # Secure MySQL installation (Set root password)
+      "echo \"ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY 'password'; FLUSH PRIVILEGES;\" | sudo mysql"
     ]
   }
 
-  # Secure MySQL installation (Only for AWS)
-  provisioner "shell" {
-    only = ["amazon-ebs.ubuntu_custom_aws"]
-    inline = [
-      "export DEBIAN_FRONTEND=noninteractive",
-      "sudo mysql -e \"ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY 'root';\"",
-      "sudo mysql -e \"FLUSH PRIVILEGES;\""
-    ]
-  }
-
-  # Install Python 3 and required dependencies (For Both AWS & GCP)
+  # Install Python 3 and required dependencies
   provisioner "shell" {
     inline = [
       "export DEBIAN_FRONTEND=noninteractive",
@@ -165,7 +164,7 @@ build {
     ]
   }
 
-  # Create systemd service for Flask app (For Both AWS & GCP)
+  # Create systemd service for Flask app
   provisioner "shell" {
     inline = [
       "cat <<EOF | sudo tee /etc/systemd/system/webapp.service",
@@ -174,14 +173,13 @@ build {
       "After=network.target",
       "",
       "[Service]",
-      "User=csye6225",
-      "Group=csye6225",
-      "WorkingDirectory=/home/csye6225/webapp",
-      "ExecStart=/home/csye6225/webapp/venv/bin/python /home/csye6225/webapp/app.py",
+      "User=ubuntu",
+      "WorkingDirectory=/home/ubuntu/webapp",
+      "ExecStart=/home/ubuntu/webapp/venv/bin/python /home/ubuntu/webapp/app.py",
       "Restart=always",
       "Environment=FLASK_APP=app.py",
       "Environment=FLASK_ENV=production",
-      "Environment=PATH=/home/csye6225/webapp/venv/bin:$PATH",
+      "Environment=PATH=/home/ubuntu/webapp/venv/bin:$PATH",
       "",
       "[Install]",
       "WantedBy=multi-user.target",
@@ -189,7 +187,7 @@ build {
     ]
   }
 
-  # Enable and start Flask service (For Both AWS & GCP)
+  # Enable and start Flask service
   provisioner "shell" {
     inline = [
       "sudo systemctl daemon-reload",
@@ -198,7 +196,7 @@ build {
     ]
   }
 
-  # Cleanup provisioner (For Both AWS & GCP)
+  # Cleanup provisioner
   provisioner "shell" {
     inline = [
       "sudo apt-get autoremove -y",
