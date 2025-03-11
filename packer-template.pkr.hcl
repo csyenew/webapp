@@ -116,51 +116,77 @@ source "googlecompute" "ubuntu_custom_gcp" {
 }
 
 # Build Configuration
+# Build Configuration for AWS and GCP
 build {
   sources = [
-    "source.amazon-ebs.ubuntu_custom_aws",
+    "source.amazon-ebs.ubuntu_custom_aws",  # Un-commented AWS source
     "source.googlecompute.ubuntu_custom_gcp"
   ]
 
+  # Provisioning with shell script for MySQL setup and Flask app deployment
   provisioner "shell" {
-    inline = [
-      "echo 'export DEBIAN_FRONTEND=noninteractive' | sudo tee -a /etc/environment",
+  inline = [
+    "echo 'export DEBIAN_FRONTEND=noninteractive' | sudo tee -a /etc/environment",
     "export DEBIAN_FRONTEND=noninteractive",
+
+    # Update package list and upgrade all packages
+    "echo 'Upgrading all packages...'",
     "sudo apt-get update -y",
-    # "sudo apt-get -o DPkg::Options::='--force-confdef' -o DPkg::Options::='--force-confold' upgrade -y",
+    "sudo apt-get upgrade -y",
 
-      # # Add MySQL repository and install required dependencies
-      "sudo apt-get install -y wget lsb-release gnupg",
-      "wget -c https://dev.mysql.com/get/mysql-apt-config_0.8.22-1_all.deb",
-      # "echo mysql-apt-config mysql-apt-config/select-server select mysql-8.0 | sudo debconf-set-selections",
-      "sudo apt-get update -y",
+    # Add MySQL repository and install required dependencies
+    "echo 'Installing MySQL dependencies...'",
+    "sudo apt-get install -y wget lsb-release gnupg",
+    "wget -c https://repo.mysql.com//mysql-apt-config_0.8.22-1_all.deb",
+    "sudo apt-get update -y",
 
-      # # Install MySQL Server and required packages
-      "sudo apt-get install -y mysql-server mysql-client",
+    # Install MySQL Server and MySQL Client
+    "echo 'Installing MySQL server and client...'",
+    "sudo apt-get install -y mysql-server mysql-client || { echo 'MySQL installation failed'; exit 1; }",
 
-      # # Start MySQL service
-      # "sudo systemctl enable mysql",
-      # "sudo systemctl start mysql",
+    # Install pip3 (needed for Python package installations)
+    "echo 'Installing pip3...'",
+    "sudo apt-get install -y python3-pip python3-venv || { echo 'Python installation failed'; exit 1; }",
 
-      # # Secure MySQL installation
-      # "echo \"ALTER USER \\\"root\\\"@\\\"localhost\\\" IDENTIFIED WITH mysql_native_password BY \\\"password\\\"; FLUSH PRIVILEGES;\" | sudo mysql",
+    # Start and Enable MySQL Service
+    "echo 'Starting MySQL service...'",
+    "sudo systemctl enable mysql",
+    "sudo systemctl start mysql",
+
+    # Create the csye6225 group
+    "echo 'Creating group csye6225...'",
+    "sudo groupadd csye6225 || { echo 'Group creation failed'; exit 1; }",
+
+    # Create a Python virtual environment
+    "echo 'Creating Python virtual environment...'",
+    "python3 -m venv /home/ubuntu/webapp/venv",
+
+    # Activate the virtual environment and install dependencies
+    "echo 'Activating virtual environment and installing dependencies...'",
+    ". /home/ubuntu/webapp/venv/bin/activate && pip install --upgrade pip && pip install Flask==2.2.2 Flask-SQLAlchemy==3.0.2 Flask-Migrate==3.1.0 python-dotenv==0.21.0 mysql-connector-python==8.0.31 werkzeug==2.2.2 pytest==8.3.4 || exit 1",
+
+    # Create user csye6225 with no login shell
+    "echo 'Creating user csye6225 with no login shell...'",
+    "sudo useradd -r -m -s /usr/sbin/nologin -g csye6225 csye6225 || { echo 'User creation failed'; exit 1; }",
+
+    # Restart MySQL service to apply changes
+    "echo 'Restarting MySQL service...'",
+    "sudo systemctl restart mysql || exit 1",
+
+    # Check MySQL installation
+    "echo 'Checking MySQL installation...'",
+    "mysql --version || { echo 'MySQL installation failed'; exit 1; }",
+
+    # Check virtual environment
+    "echo 'Checking virtual environment...'",
+    "which python || { echo 'Virtual environment activation failed'; exit 1; }"
+  ]
+}
 
 
-      // MySQL Setup
-      "sudo systemctl enable mysql",
-      "sudo systemctl start mysql",
 
-      // Create user csye6225
-      "sudo groupadd csye6225 || true",
-      "sudo useradd -r -m -s /usr/sbin/nologin -g csye6225 csye6225 || true",
 
-      // Setup Flask App
-      "sudo mkdir -p /home/csye6225/webapp",
-      "sudo chown -R csye6225:csye6225 /home/csye6225/webapp",
-      "sudo -u csye6225 python3 -m venv /home/csye6225/webapp/venv",
-      "sudo -u csye6225 /home/csye6225/webapp/venv/bin/pip install Flask Flask-SQLAlchemy Flask-Migrate python-dotenv mysql-connector-python werkzeug pytest"
-    ]
-  }
+
 
   // Create systemd service file using heredoc
   provisioner "shell" {
