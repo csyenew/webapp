@@ -136,7 +136,7 @@ jobs:
             exit 1
           fi
           packer build .
-        shell: bash
+        shell: /usr/bin/bash --noprofile --norc -e -o pipefail
 
   update-launch-template:
     name: Update Launch Template
