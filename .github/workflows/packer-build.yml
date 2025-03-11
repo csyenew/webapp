@@ -123,6 +123,7 @@ jobs:
         run: |
           if [[ "$PLATFORM" == "aws" ]]; then
             echo "Building AWS image..."
+            aws configure list-profiles 
             packer build packer-template.pkr.hcl
           fi
 
