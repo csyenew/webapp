@@ -107,6 +107,16 @@ jobs:
           gcloud auth activate-service-account --key-file=$HOME/gcp-key.json
           gcloud config set project "$(jq -r '.project_id' $HOME/gcp-key.json)"
 
+      - name: Check GCP Address Quota
+        if: matrix.platform == 'gcp'
+        run: |
+          address_quota=$(gcloud compute regions describe us-central1 --format="value(quotas[metric=IN_USE_ADDRESSES].limit)")
+          address_usage=$(gcloud compute addresses list --filter="region:us-central1" --format="value(address)" | wc -l)
+          if [ "$address_usage" -ge "$address_quota" ]; then
+            echo "Error: Address quota exceeded. Current usage: $address_usage, Limit: $address_quota"
+            exit 1
+          fi
+
       - name: Build Application Artifact
         run: |
           tar -czvf app_artifact.tar.gz app.py config.py packer-template.pkr.hcl requirements.txt webapp.service
@@ -120,7 +130,19 @@ jobs:
           AWS_PROFILE: default
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        run: packer build .
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ env.HOME }}/gcp-key.json
+        run: |
+          packer build . || {
+            echo "Handling quota errors..."
+            if [ "${{ matrix.platform }}" == "aws" ]; then
+              echo "Adjusting AWS instance type or region..."
+              # Adjust AWS instance type or region here
+            elif [ "${{ matrix.platform }}" == "gcp" ]; then
+              echo "Adjusting GCP region..."
+              # Adjust GCP region here
+            fi
+            exit 1
+          }
 
   update-launch-template:
     name: Update Launch Template
