@@ -72,30 +72,31 @@ jobs:
 
       - name: Configure GCP Authentication
         if: matrix.platform == 'gcp'
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS_JSON: ${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}
         run: |
           echo "🔍 Setting up GCP authentication..."
 
           # Ensure the secret exists
-          if [[ -z "$GOOGLE_APPLICATION_CREDENTIALS" ]]; then
-            echo "❌ ERROR: GOOGLE_APPLICATION_CREDENTIALS is empty!"
+          if [[ -z "$GOOGLE_APPLICATION_CREDENTIALS_JSON" ]]; then
+            echo "❌ ERROR: GOOGLE_APPLICATION_CREDENTIALS_JSON is empty!"
             exit 1
           fi
 
-          # Store credentials in a file
-          echo "$GOOGLE_APPLICATION_CREDENTIALS" | base64 --decode > "$HOME/gcp-key.json"
+          # Decode and save credentials to a file
+          echo "$GOOGLE_APPLICATION_CREDENTIALS_JSON" | base64 --decode > "$HOME/gcp-key.json"
 
-          # Export the credentials file path
+          # Set the environment variable to the file path
           echo "GOOGLE_APPLICATION_CREDENTIALS=$HOME/gcp-key.json" >> $GITHUB_ENV
-          export GOOGLE_APPLICATION_CREDENTIALS="$HOME/gcp-key.json"
 
-          echo "✅ GCP credentials saved to: $GOOGLE_APPLICATION_CREDENTIALS"
+          echo "✅ GCP credentials saved to: $HOME/gcp-key.json"
 
           # Verify JSON validity
-          cat "$GOOGLE_APPLICATION_CREDENTIALS" | jq . || echo "❌ Invalid JSON!"
+          cat "$HOME/gcp-key.json" | jq . || echo "❌ Invalid JSON!"
 
           # Authenticate with GCP
-          gcloud auth activate-service-account --key-file="$GOOGLE_APPLICATION_CREDENTIALS"
-          gcloud config set project "$(jq -r '.project_id' $GOOGLE_APPLICATION_CREDENTIALS)"
+          gcloud auth activate-service-account --key-file="$HOME/gcp-key.json"
+          gcloud config set project "$(jq -r '.project_id' $HOME/gcp-key.json)"
 
       - name: Debug GCP Authentication Before Packer
         if: matrix.platform == 'gcp'
