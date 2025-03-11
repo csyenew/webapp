@@ -131,13 +131,19 @@ jobs:
 
       # ✅ Run Packer Build for AWS & GCP
       - name: Build AWS & GCP Images with Packer
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: us-east-1
+          GOOGLE_APPLICATION_CREDENTIALS: $HOME/gcp-key.json
+          AWS_PROFILE: default
         run: |
-          echo "Using GOOGLE_APPLICATION_CREDENTIALS: $GOOGLE_APPLICATION_CREDENTIALS"
           if [[ ! -f "$GOOGLE_APPLICATION_CREDENTIALS" ]]; then
             echo "❌ ERROR: GOOGLE_APPLICATION_CREDENTIALS file not found!"
             exit 1
           fi
           packer build .
+        shell: /usr/bin/bash --noprofile --norc -e -o pipefail
 
   update-launch-template:
     name: Update Launch Template
