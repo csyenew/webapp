@@ -50,8 +50,9 @@ jobs:
 
       - name: Install AWS CLI
         run: |
-          sudo apt-get update
-          sudo apt-get install -y awscli
+          curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+          unzip awscliv2.zip
+          sudo ./aws/install
           aws --version
 
       - name: Install GCP SDK
@@ -83,7 +84,7 @@ jobs:
           echo "[default]" > ~/.aws/config
           echo "aws_access_key_id=${{ secrets.AWS_ACCESS_KEY_ID }}" >> ~/.aws/credentials
           echo "aws_secret_access_key=${{ secrets.AWS_SECRET_ACCESS_KEY }}" >> ~/.aws/credentials
-          echo "region=us-east-1" >> ~/..aws/config
+          echo "region=us-east-1" >> ~/.aws/config
 
       - name: Decode and Store GCP Credentials
         if: matrix.platform == 'gcp'
