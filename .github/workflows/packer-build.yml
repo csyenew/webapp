@@ -78,7 +78,7 @@ jobs:
           echo "$GOOGLE_APPLICATION_CREDENTIALS_JSON" > gcp-key.json
           export GOOGLE_APPLICATION_CREDENTIALS=$PWD/gcp-key.json
           echo "Using GCP credentials from: $GOOGLE_APPLICATION_CREDENTIALS"
-
+ 
           # Debugging: Verify file exists
           ls -l gcp-key.json
           
