@@ -123,7 +123,7 @@ jobs:
         run: |
           if [[ "$PLATFORM" == "aws" ]]; then
             echo "Building AWS image..."
-            aws configure list-profiles 
+            export AWS_PROFILE=default
             packer build packer-template.pkr.hcl
           fi
 
