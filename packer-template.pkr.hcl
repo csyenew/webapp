@@ -13,6 +13,7 @@ packer {
   }
 }
 
+
 # Define variables for AWS and GCP
 variable "aws_access_key" {
   type    = string
