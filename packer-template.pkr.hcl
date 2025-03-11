@@ -14,22 +14,6 @@ packer {
 }
 
 
-# Define variables for AWS and GCP
-variable "aws_access_key" {
-  type    = string
-  default = ""
-}
-
-variable "aws_secret_key" {
-  type    = string
-  default = ""
-}
-
-variable "aws_region" {
-  type    = string
-  default = "us-east-1"
-}
-
 variable "gcp_project_id" {
   type    = string
   default = "csye-dev-451921-452108"
@@ -47,9 +31,6 @@ variable "artifact_path" {
 
 # AWS Source Configuration
 source "amazon-ebs" "ubuntu_custom_aws" {
-  region     = var.aws_region
-  access_key = var.aws_access_key
-  secret_key = var.aws_secret_key
 
   source_ami_filter {
     filters = {

@@ -41,6 +41,10 @@ jobs:
   packer-build:
     needs: [packer-fmt-validate]  # Ensure validation passes before building
     runs-on: ubuntu-latest
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_DEFAULT_REGION: "us-east-1"
     strategy:
       matrix:
         platform: [aws, gcp]  # Build images for AWS and GCP in parallel
@@ -104,10 +108,8 @@ jobs:
           zip -r app_artifact.zip app.py config.py packer-template.pkr.hcl requirements.txt webapp.service
           echo "Artifact built successfully"
 
-
       - name: Run Packer Init
-        run: |
-          packer init .
+        run: packer init .
 
       - name: Build AWS & GCP Images with Packer
         env:
@@ -118,16 +120,9 @@ jobs:
           GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
           GOOGLE_APPLICATION_CREDENTIALS_JSON: ${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}
         run: |
-          echo "Building image for $PLATFORM..."
-
-          # AWS Image Build
           if [[ "$PLATFORM" == "aws" ]]; then
             echo "Building AWS image..."
-            packer build \
-              -var "aws_access_key=${AWS_ACCESS_KEY_ID}" \
-              -var "aws_secret_key=${AWS_SECRET_ACCESS_KEY}" \
-              -var "artifact_path=app_artifact.zip" \
-              packer-template.pkr.hcl
+            packer build packer-template.pkr.hcl
           fi
 
           # GCP Image Build
