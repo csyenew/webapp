@@ -124,16 +124,27 @@ build {
 
   provisioner "shell" {
     inline = [
-      "export DEBIAN_FRONTEND=noninteractive",
-      "sudo apt-get update -y && sudo apt-get upgrade -y",
-      "sudo apt-get install -y wget lsb-release gnupg curl",
+      "echo 'export DEBIAN_FRONTEND=noninteractive' | sudo tee -a /etc/environment",
+    "export DEBIAN_FRONTEND=noninteractive",
+    "sudo apt-get update -y",
+    # "sudo apt-get -o DPkg::Options::='--force-confdef' -o DPkg::Options::='--force-confold' upgrade -y",
 
-      // Add MySQL APT repository and its public key
-      "wget https://dev.mysql.com/get/mysql-apt-config_0.8.17-1_all.deb",
-      "sudo dpkg -i mysql-apt-config_0.8.17-1_all.deb",
-      "wget -qO - https://repo.mysql.com/RPM-GPG-KEY-mysql-2022 | sudo apt-key add -",
+      # # Add MySQL repository and install required dependencies
+      "sudo apt-get install -y wget lsb-release gnupg",
+      "wget -c https://dev.mysql.com/get/mysql-apt-config_0.8.22-1_all.deb",
+      # "echo mysql-apt-config mysql-apt-config/select-server select mysql-8.0 | sudo debconf-set-selections",
       "sudo apt-get update -y",
-      "sudo apt-get install -y mysql-server mysql-client python3-pip python3-venv",
+
+      # # Install MySQL Server and required packages
+      "sudo apt-get install -y mysql-server mysql-client",
+
+      # # Start MySQL service
+      # "sudo systemctl enable mysql",
+      # "sudo systemctl start mysql",
+
+      # # Secure MySQL installation
+      # "echo \"ALTER USER \\\"root\\\"@\\\"localhost\\\" IDENTIFIED WITH mysql_native_password BY \\\"password\\\"; FLUSH PRIVILEGES;\" | sudo mysql",
+
 
       // MySQL Setup
       "sudo systemctl enable mysql",
