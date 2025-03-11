@@ -129,37 +129,4 @@ jobs:
           GOOGLE_APPLICATION_CREDENTIALS: /home/runner/gcp-key.json
         run: packer build -only=googlecompute.ubuntu_custom_gcp .
 
-  update-launch-template:
-    name: Update Launch Template
-    runs-on: ubuntu-latest
-    needs: [packer-build]
-    env:
-      AWS_REGION: us-east-1  # Set your AWS region here
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
-
-      - name: Retrieve Latest AMI ID
-        run: |
-          LATEST_AMI_ID=$(aws ec2 describe-images --owners self --region $AWS_REGION \
-            --query 'Images[*].[ImageId]' --output text | tail -n1)
-          echo "Latest AMI: $LATEST_AMI_ID"
-          echo "LATEST_AMI_ID=$LATEST_AMI_ID" >> $GITHUB_ENV
-
-      - name: Get Latest Launch Template Version
-        run: |
-          VERSION_NUMBER=$(aws ec2 describe-launch-templates --launch-template-names asg_launch_config \
-            --query 'LaunchTemplates[0].LatestVersionNumber' --output text --region $AWS_REGION)
-          echo "Current Version: $VERSION_NUMBER"
-          echo "VERSION_NUMBER=$VERSION_NUMBER" >> $GITHUB_ENV
-
-      - name: Create new Launch Template version
-        run: |
-          aws ec2 create-launch-template-version --launch-template-name asg_launch_config \
-            --source-version $VERSION_NUMBER \
-            --launch-template-data '{"ImageId":"'"$LATEST_AMI_ID"'"}' --region $AWS_REGION
-
-      - name: Start AWS Auto Scaling Group Refresh
-        run: |
-          aws autoscaling start-instance-refresh --auto-scaling-group-name csye6225-asg-spring2023 \
-            --strategy Rolling --region $AWS_REGION
+ 
