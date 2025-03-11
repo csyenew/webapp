@@ -83,10 +83,10 @@ jobs:
             exit 1
           fi
 
-          # Decode and store credentials
+          # Decode the secret and save it as a credentials file
           echo "$GOOGLE_APPLICATION_CREDENTIALS_JSON" | base64 --decode > "$HOME/gcp-key.json"
 
-          # Ensure file exists
+          # Verify that the file exists
           if [[ ! -f "$HOME/gcp-key.json" ]]; then
             echo "❌ ERROR: Credentials file not found at $HOME/gcp-key.json"
             exit 1
@@ -99,25 +99,22 @@ jobs:
           fi
 
           echo "✅ GCP credentials stored successfully at: $HOME/gcp-key.json"
-          
           ls -l "$HOME/gcp-key.json"
 
           # Set the environment variable for future steps
           echo "GOOGLE_APPLICATION_CREDENTIALS=$HOME/gcp-key.json" >> $GITHUB_ENV
 
 
-      - name: Debug GCP Authentication Before Packer
+      - name: Debug GCP Credentials File Before Packer
         if: matrix.platform == 'gcp'
         run: |
-          echo "🔍 Checking Environment Variables"
+          echo "🔍 Checking GOOGLE_APPLICATION_CREDENTIALS"
           echo "GOOGLE_APPLICATION_CREDENTIALS: $GOOGLE_APPLICATION_CREDENTIALS"
           
           ls -l "$GOOGLE_APPLICATION_CREDENTIALS" || echo "❌ Credential file not found!"
           
           cat "$GOOGLE_APPLICATION_CREDENTIALS" | jq . || echo "❌ Invalid JSON!"
-          
-          echo "🔍 Running GCP Authentication Test..."
-          gcloud auth list
+
 
       - name: Build Application Artifact
         run: |
