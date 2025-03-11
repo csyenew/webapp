@@ -32,6 +32,12 @@ jobs:
           sudo apt-get install -y packer
           packer --version  # Verify installation
 
+      - name: Run packer init
+        run: |
+          packer init .
+        continue-on-error: false
+
+
       - name: Run packer fmt
         run: |
           packer fmt -check -diff .
