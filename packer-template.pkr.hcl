@@ -119,30 +119,9 @@ build {
     "echo 'Checking virtual environment...'",
     "which python || { echo 'Virtual environment activation failed'; exit 1; }",
 
-    # Install Python & Dependencies
-      "sudo apt-get install -y python3-pip python3-venv",
-      
-      # Setup Flask App
-      "sudo mkdir -p /home/csye6225/webapp",
-      "sudo chown -R csye6225:csye6225 /home/csye6225/webapp",
-      "python3 -m venv /home/csye6225/webapp/venv"
+    
 
 ]
-  }
-  # Copy Application Files
-  provisioner "file" {
-    source      = "app.py"
-    destination = "/home/csye6225/webapp/app.py"
-  }
-
-  provisioner "file" {
-    source      = "config.py"
-    destination = "/home/csye6225/webapp/config.py"
-  }
-
-  provisioner "file" {
-    source      = "requirements.txt"
-    destination = "/home/csye6225/webapp/requirements.txt"
   }
 
     # Create systemd service for Flask app using a script file
