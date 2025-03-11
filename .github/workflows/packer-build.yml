@@ -83,26 +83,17 @@ jobs:
             exit 1
           fi
 
-          # Decode the JSON key and save it to a file
+          # Decode and store credentials
           echo "$GOOGLE_APPLICATION_CREDENTIALS_JSON" | base64 --decode > "$HOME/gcp-key.json"
 
-          # Ensure the credentials file is valid
+          # Validate JSON
           if ! jq empty "$HOME/gcp-key.json" >/dev/null 2>&1; then
             echo "❌ ERROR: Invalid JSON in gcp-key.json!"
             exit 1
           fi
 
-          # Set the correct file path for authentication
+          # Set the correct path
           echo "GOOGLE_APPLICATION_CREDENTIALS=$HOME/gcp-key.json" >> $GITHUB_ENV
-
-          echo "✅ GCP credentials stored at: $HOME/gcp-key.json"
-
-          # Debugging: Confirm the file exists
-          ls -l "$HOME/gcp-key.json"
-
-          # Authenticate with GCP
-          gcloud auth activate-service-account --key-file="$HOME/gcp-key.json"
-          gcloud config set project "$(jq -r '.project_id' $HOME/gcp-key.json)"
 
 
       - name: Debug GCP Authentication Before Packer
@@ -129,6 +120,7 @@ jobs:
       - name: Build AWS & GCP Images with Packer
         env:
           AWS_PROFILE: default
+          GOOGLE_APPLICATION_CREDENTIALS: $HOME/gcp-key.json
         run: packer build .
 
   update-launch-template:
