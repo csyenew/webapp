@@ -75,8 +75,14 @@ jobs:
           GOOGLE_APPLICATION_CREDENTIALS_JSON: ${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}
         run: |
           echo "Decoding GCP credentials..."
-           
-          # Decode the Base64 secret before storing
+          
+          # Ensure the secret is set
+          if [[ -z "$GOOGLE_APPLICATION_CREDENTIALS_JSON" ]]; then
+            echo "ERROR: GOOGLE_APPLICATION_CREDENTIALS_JSON is empty!"
+            exit 1
+          fi
+          
+          # Decode the Base64 secret
           echo "$GOOGLE_APPLICATION_CREDENTIALS_JSON" | base64 --decode > gcp-key.json
           
           # Set the environment variable for Packer & GCP
