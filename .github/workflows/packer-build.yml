@@ -17,7 +17,7 @@ jobs:
 
       - name: Install Packer
         run: |
-          sudo apt-get update 
+          sudo apt-get update
           sudo apt-get install -y gnupg software-properties-common wget unzip
           wget https://releases.hashicorp.com/packer/1.8.0/packer_1.8.0_linux_amd64.zip
           unzip packer_1.8.0_linux_amd64.zip
@@ -86,13 +86,6 @@ jobs:
           echo "aws_secret_access_key=${{ secrets.AWS_SECRET_ACCESS_KEY }}" >> ~/.aws/credentials
           echo "region=us-east-1" >> ~/.aws/config
 
-      - name: Set up SSH Private Key for AWS
-        if: matrix.platform == 'aws'
-        run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.AWS_SSH_PRIVATE_KEY }}" > ~/.ssh/packer-key.pem
-          chmod 600 ~/.ssh/packer-key.pem
-
       - name: Decode and Store GCP Credentials
         if: matrix.platform == 'gcp'
         env:
@@ -127,8 +120,7 @@ jobs:
           AWS_PROFILE: default
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        run: packer .
-
+        run: packer build .
 
   update-launch-template:
     name: Update Launch Template
