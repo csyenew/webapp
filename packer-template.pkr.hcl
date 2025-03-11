@@ -172,14 +172,19 @@ build {
 
   # Enable and start the service
   provisioner "shell" {
-  inline = [
-    "export DEBIAN_FRONTEND=noninteractive",
-    "sudo apt-get update -y && sudo apt-get upgrade -y",
-    "sudo apt-get install -y --fix-missing mecab-ipadic-utf8 python3-venv mysql-server mysql-client python3-pip",
-    "sudo apt-get install -f -y",  # Fix any missing dependencies
-    "sudo apt-get autoremove -y",  # Clean up unused packages
-    "sudo apt-get clean"
-  ]
-}
+    inline = [
+      "sudo systemctl daemon-reload",
+      "sudo systemctl enable webapp.service",
+      "sudo systemctl start webapp.service"
+    ]
+  }
 
+  # Fix broken packages and clean up
+  provisioner "shell" {
+    inline = [
+      "sudo apt-get install -f -y",  # Fix any missing dependencies
+      "sudo apt-get autoremove -y",  # Clean up unused packages
+      "sudo apt-get clean"
+    ]
+  }
 }
