@@ -78,7 +78,7 @@ source "googlecompute" "ubuntu_custom_gcp" {
   image_family        = "custom-ubuntu"
   image_description   = "Custom Ubuntu 24.04 LTS with MySQL and Flask"
   ssh_username        = "ubuntu"
-} 
+}
 
 # Build Configuration
 build {

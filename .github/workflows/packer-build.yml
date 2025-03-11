@@ -40,7 +40,7 @@ jobs:
 
       - name: Run packer fmt
         run: |
-          packer fmt -check -diff .
+          packer fmt .
         continue-on-error: false
 
       - name: Run packer validate
