@@ -83,8 +83,8 @@ jobs:
           echo "[default]" > ~/.aws/credentials
           echo "[default]" > ~/.aws/config
           echo "aws_access_key_id=${{ secrets.AWS_ACCESS_KEY_ID }}" >> ~/.aws/credentials
-          echo "aws_secret_access_key=${{ secrets.AWS_SECRET_ACCESS_KEY }}" >> ~/.aws/credentials
-          echo "region=us-east-1" >> ~/.aws/config
+          echo "aws_secret_access_key=${{ secrets.AWS_SECRET_ACCESS_KEY }}" >> ~/..aws/credentials
+          echo "region=us-east-1" >> ~/..aws/config
 
       - name: Check AWS vCPU Quota
         if: matrix.platform == 'aws'
@@ -140,7 +140,7 @@ jobs:
           AWS_PROFILE: default
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          GOOGLE_APPLICATION_CREDENTIALS: $HOME/gcp-key.json
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ env.HOME }}/gcp-key.json
         run: packer build .
 
   update-launch-template:
