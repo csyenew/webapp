@@ -137,25 +137,79 @@ jobs:
           packer init .
         continue-on-error: false
 
-      - name: Build Custom Image for ${{ matrix.platform }}
+      name: Build AWS & GCP Images with Packer
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  packer-build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        platform: [aws, gcp]  # Run for both AWS and GCP
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v2
+
+      - name: Install Packer
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y wget unzip
+          wget https://releases.hashicorp.com/packer/1.8.0/packer_1.8.0_linux_amd64.zip
+          unzip packer_1.8.0_linux_amd64.zip
+          sudo mv packer /usr/local/bin/
+          packer --version
+
+      - name: Run Packer Init
+        run: |
+          packer init .
+
+      - name: Authenticate and Build Image for ${{ matrix.platform }}
         env:
           PLATFORM: ${{ matrix.platform }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: "us-east-1"
+          GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+          GOOGLE_APPLICATION_CREDENTIALS_JSON: ${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}
         run: |
+          echo "Building image for $PLATFORM..."
+
+          # AWS Image Build
           if [[ "$PLATFORM" == "aws" ]]; then
+            echo "Configuring AWS credentials..."
+            mkdir -p ~/.aws
+            echo "[default]" > ~/.aws/config
+            echo "aws_access_key_id=${AWS_ACCESS_KEY_ID}" > ~/.aws/credentials
+            echo "aws_secret_access_key=${AWS_SECRET_ACCESS_KEY}" >> ~/.aws/credentials
+            echo "region=us-east-1" >> ~/.aws/config
+
             echo "Building AWS image..."
             packer build \
-              -var "aws_access_key=${{ secrets.AWS_ACCESS_KEY_ID }}" \
-              -var "aws_secret_key=${{ secrets.AWS_SECRET_ACCESS_KEY }}" \
+              -var "aws_access_key=${AWS_ACCESS_KEY_ID}" \
+              -var "aws_secret_key=${AWS_SECRET_ACCESS_KEY}" \
               -var "artifact_path=app_artifact.zip" \
               packer-template.pkr.hcl
-          elif [[ "$PLATFORM" == "gcp" ]]; then
+          fi
+
+          # GCP Image Build
+          if [[ "$PLATFORM" == "gcp" ]]; then
+            echo "Setting up GCP authentication..."
+            echo "${GOOGLE_APPLICATION_CREDENTIALS_JSON}" > gcp-key.json
+            export GOOGLE_APPLICATION_CREDENTIALS=gcp-key.json
+
             echo "Building GCP image..."
             packer build \
-              -var "gcp_project_id=${{ secrets.GCP_PROJECT_ID }}" \
+              -var "gcp_project_id=${GCP_PROJECT_ID}" \
               -var "gcp_credentials_file=gcp-key.json" \
               -var "artifact_path=app_artifact.zip" \
               packer-template.pkr.hcl
           fi
+
 
 
       - name: Create local user csye6225
