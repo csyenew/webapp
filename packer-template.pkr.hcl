@@ -124,20 +124,30 @@ build {
 
   provisioner "shell" {
     inline = [
+      # Set non-interactive mode to avoid prompts
+      "echo 'export DEBIAN_FRONTEND=noninteractive' | sudo tee -a /etc/environment",
       "export DEBIAN_FRONTEND=noninteractive",
-      "sudo apt-get update -y && sudo apt-get install -y lsb-release gnupg curl",
-
-      # Add MySQL repository
-      "curl -sS https://dev.mysql.com/get/mysql-apt-config_0.8.22-1_all.deb -o mysql-apt-config.deb",
-      "sudo dpkg -i mysql-apt-config.deb",
+      
+      # Update package lists
       "sudo apt-get update -y",
 
-      # Install MySQL
+      # Install required dependencies
+      "sudo apt-get install -y wget lsb-release gnupg curl",
+
+      # Download and install MySQL APT repository
+      "wget -c https://dev.mysql.com/get/mysql-apt-config_0.8.22-1_all.deb",
+      "sudo dpkg -i mysql-apt-config_0.8.22-1_all.deb",
+      "sudo apt-get update -y",
+
+      # Install MySQL Server and Client
       "sudo apt-get install -y mysql-server mysql-client",
 
-      # Start MySQL
+      # Enable and start MySQL service
       "sudo systemctl enable mysql",
       "sudo systemctl start mysql",
+
+      # Secure MySQL Installation - Change root password
+      #"echo \"ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY 'password'; FLUSH PRIVILEGES;\" | sudo mysql",
 
       # Setup Flask App
       "sudo groupadd csye6225 || true",
@@ -147,7 +157,7 @@ build {
       "sudo -u csye6225 python3 -m venv /home/csye6225/webapp/venv",
       "sudo -u csye6225 /home/csye6225/webapp/venv/bin/pip install Flask Flask-SQLAlchemy Flask-Migrate python-dotenv mysql-connector-python werkzeug pytest",
 
-      # Corrected systemd service file creation
+      # Create systemd service for Flask app
       "echo '[Unit]' | sudo tee /etc/systemd/system/webapp.service",
       "echo 'Description=Flask Web Application' | sudo tee -a /etc/systemd/system/webapp.service",
       "echo 'After=network.target' | sudo tee -a /etc/systemd/system/webapp.service",
@@ -165,7 +175,7 @@ build {
       "echo '[Install]' | sudo tee -a /etc/systemd/system/webapp.service",
       "echo 'WantedBy=multi-user.target' | sudo tee -a /etc/systemd/system/webapp.service",
 
-      # Enable and start the service
+      # Enable and start Flask service
       "sudo systemctl daemon-reload",
       "sudo systemctl enable webapp",
       "sudo systemctl start webapp"
