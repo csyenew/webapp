@@ -134,9 +134,13 @@ build {
       # Install required dependencies
       "sudo apt-get install -y wget lsb-release gnupg curl",
 
-      # Download and install MySQL APT repository
-      "wget -c https://dev.mysql.com/get/mysql-apt-config_0.8.22-1_all.deb",
-      "sudo dpkg -i mysql-apt-config_0.8.22-1_all.deb",
+      # Add MySQL's official public GPG key (Fixes NO_PUBKEY error)
+      "wget -qO - https://repo.mysql.com/RPM-GPG-KEY-mysql-2022 | sudo tee /usr/share/keyrings/mysql-archive-keyring.gpg",
+
+      # Manually configure MySQL APT repository (Use Debian Bullseye as Bookworm is not supported)
+      "echo 'deb [signed-by=/usr/share/keyrings/mysql-archive-keyring.gpg] http://repo.mysql.com/apt/debian bullseye mysql-8.0' | sudo tee /etc/apt/sources.list.d/mysql.list",
+
+      # Update package lists after adding MySQL repository
       "sudo apt-get update -y",
 
       # Install MySQL Server and Client
@@ -147,7 +151,7 @@ build {
       "sudo systemctl start mysql",
 
       # Secure MySQL Installation - Change root password
-      #"echo \"ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY 'password'; FLUSH PRIVILEGES;\" | sudo mysql",
+      "echo \"ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY 'password'; FLUSH PRIVILEGES;\" | sudo mysql",
 
       # Setup Flask App
       "sudo groupadd csye6225 || true",
