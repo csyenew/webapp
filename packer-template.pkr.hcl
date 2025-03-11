@@ -121,9 +121,7 @@ build {
 
     # Install Python & Dependencies
       "sudo apt-get install -y python3-pip python3-venv",
-      "sudo groupadd csye6225",
-      "sudo useradd -r -m -s /usr/sbin/nologin -g csye6225 csye6225",
-
+      
       # Setup Flask App
       "sudo mkdir -p /home/csye6225/webapp",
       "sudo chown -R csye6225:csye6225 /home/csye6225/webapp",
