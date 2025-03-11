@@ -36,7 +36,7 @@ variable "instance_type" {
 
 variable "ssh_username" {
   type    = string
-  default = "ubuntu"
+  default = "admin"
 }
 
 variable "subnet_id" {
