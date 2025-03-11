@@ -117,7 +117,29 @@ build {
 
     # Check virtual environment
     "echo 'Checking virtual environment...'",
-    "which python || { echo 'Virtual environment activation failed'; exit 1; }"
+    "which python || { echo 'Virtual environment activation failed'; exit 1; }",
+
+
+    # Create systemd service for Flask app
+    "echo '[Unit]' > /etc/systemd/system/webapp.service",
+    "echo 'Description=Flask Web Application' >> /etc/systemd/system/webapp.service",
+    "echo 'After=network.target' >> /etc/systemd/system/webapp.service",
+    "echo '[Service]' >> /etc/systemd/system/webapp.service",
+    "echo 'User=csye6225' >> /etc/systemd/system/webapp.service",
+    "echo 'Group=csye6225' >> /etc/systemd/system/webapp.service",
+    "echo 'WorkingDirectory=/home/csye6225/webapp' >> /etc/systemd/system/webapp.service",
+    "echo 'ExecStart=/home/csye6225/webapp/venv/bin/python /home/csye6225/webapp/app.py' >> /etc/systemd/system/webapp.service",
+    "echo 'Restart=always' >> /etc/systemd/system/webapp.service",
+    "echo 'Environment=\"FLASK_APP=app.py\"' >> /etc/systemd/system/webapp.service",
+    "echo 'Environment=\"FLASK_ENV=production\"' >> /etc/systemd/system/webapp.service",
+    "echo 'Environment=\"PATH=/home/csye6225/webapp/venv/bin:$PATH\"' >> /etc/systemd/system/webapp.service",
+    "echo '[Install]' >> /etc/systemd/system/webapp.service",
+    "echo 'WantedBy=multi-user.target' >> /etc/systemd/system/webapp.service",
+
+    # Reload systemd, enable and start Flask service
+    "sudo systemctl daemon-reload",
+    "sudo systemctl enable webapp",
+    "sudo systemctl start webapp"
   ]
 }
 
