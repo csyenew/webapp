@@ -75,7 +75,7 @@ jobs:
           GOOGLE_APPLICATION_CREDENTIALS_JSON: ${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}
         run: |
           echo "Decoding GCP credentials..."
-          
+           
           # Decode the Base64 secret before storing
           echo "$GOOGLE_APPLICATION_CREDENTIALS_JSON" | base64 --decode > gcp-key.json
           
