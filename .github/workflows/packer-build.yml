@@ -143,11 +143,18 @@ jobs:
           echo "Latest AMI: $LATEST_AMI_ID"
           echo "LATEST_AMI_ID=$LATEST_AMI_ID" >> $GITHUB_ENV
 
+      - name: Get Latest Launch Template Version
+        run: |
+          VERSION_NUMBER=$(aws ec2 describe-launch-templates --launch-template-names asg_launch_config \
+            --query 'LaunchTemplates[0].LatestVersionNumber' --output text)
+          echo "Current Version: $VERSION_NUMBER"
+          echo "VERSION_NUMBER=$VERSION_NUMBER" >> $GITHUB_ENV
+
       - name: Create new Launch Template version
         run: |
           aws ec2 create-launch-template-version --launch-template-name asg_launch_config \
-            --launch-template-data "ImageId=${{ env.LATEST_AMI_ID }}" \
-            --source-version ${{ env.version_number }}
+            --source-version $VERSION_NUMBER \
+            --launch-template-data '{"ImageId":"'"$LATEST_AMI_ID"'"}'
 
       - name: Start AWS Auto Scaling Group Refresh
         run: |
