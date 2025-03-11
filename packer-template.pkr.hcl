@@ -36,7 +36,7 @@ variable "instance_type" {
 
 variable "ssh_username" {
   type    = string
-  default = "ec2-user"
+  default = "ubuntu"
 }
 
 variable "subnet_id" {
@@ -122,35 +122,25 @@ build {
     "source.googlecompute.ubuntu_custom_gcp"
   ]
 
-  # Fix MySQL Public Key Issue and Install Dependencies
+  # Install MySQL & Dependencies from Ubuntu's Official Repo (No mysql-apt-config needed)
   provisioner "shell" {
     inline = [
       "export DEBIAN_FRONTEND=noninteractive",
 
-      # Remove Old MySQL APT Config
-      "sudo rm -f /etc/apt/sources.list.d/mysql.list",
-      "sudo apt-get remove --purge mysql-apt-config -y",
-      "sudo apt-get autoremove -y",
+      # Ensure system is updated
       "sudo apt-get update -y",
+      "sudo apt-get upgrade -y",
 
-      # Install Required Packages for MySQL GPG Key
-      "sudo apt-get install -y wget gnupg2 lsb-release",
-
-      # Manually Add New MySQL GPG Key
-      "wget -qO - https://repo.mysql.com/RPM-GPG-KEY-mysql | sudo tee /usr/share/keyrings/mysql-archive-keyring.gpg > /dev/null",
-      "echo 'deb [signed-by=/usr/share/keyrings/mysql-archive-keyring.gpg] http://repo.mysql.com/apt/ubuntu $(lsb_release -sc) mysql-8.0' | sudo tee /etc/apt/sources.list.d/mysql.list",
-      "sudo apt-get update -y",
-
-      # Preconfigure MySQL Root Password
-      "echo 'mysql-server mysql-server/root_password password root' | sudo debconf-set-selections",
-      "echo 'mysql-server mysql-server/root_password_again password root' | sudo debconf-set-selections",
-
-      # Install MySQL Server and Client
+      # Install MySQL directly from Ubuntu official repo
       "sudo apt-get install -y mysql-server mysql-client python3-pip python3-venv",
 
-      # Ensure MySQL Starts Automatically
+      # Ensure MySQL starts properly
       "sudo systemctl enable mysql",
-      "sudo systemctl start mysql"
+      "sudo systemctl start mysql",
+
+      # Secure MySQL installation (disable interactive mode)
+      "sudo mysql -e \"ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY 'root';\"",
+      "sudo mysql -e \"FLUSH PRIVILEGES;\""
     ]
   }
 
