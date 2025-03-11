@@ -156,7 +156,7 @@ jobs:
           packer build .
         shell: bash 
 
-  update-launch-template:
+  update-launch-template: 
     name: Update Launch Template
     runs-on: ubuntu-latest
     needs: [packer-build]
