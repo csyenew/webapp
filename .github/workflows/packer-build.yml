@@ -98,7 +98,33 @@ jobs:
           gcloud auth activate-service-account --key-file=$HOME/gcp-key.json
           gcloud config set project "$(jq -r '.project_id' $HOME/gcp-key.json)"
 
-
+      - name: Decode and Store GCP Credentials
+        run: |
+          if [[ -z "${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}" ]]; then
+            echo "ERROR: GOOGLE_APPLICATION_CREDENTIALS_JSON is empty or missing!"
+            exit 1
+          fi
+          
+          # Use printf instead of echo to prevent formatting issues
+          printf '%s' "${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}" | base64 --decode > $HOME/gcp-key.json
+          
+          # Ensure the file exists
+          if [[ ! -f "$HOME/gcp-key.json" ]]; then
+            echo "❌ ERROR: gcp-key.json file was not created!"
+            exit 1
+          fi
+          
+          # Validate JSON format
+          if ! jq empty "$HOME/gcp-key.json" > /dev/null 2>&1; then
+            echo "❌ ERROR: Invalid JSON in gcp-key.json!"
+            cat $HOME/gcp-key.json  # Print the file to debug issues
+            exit 1
+          fi
+          
+          # Set environment variable for later steps
+          echo "GOOGLE_APPLICATION_CREDENTIALS=$HOME/gcp-key.json" >> $GITHUB_ENV
+          echo "✅ GCP credentials stored successfully."
+        shell: bash
 
       - name: Build Application Artifact
         run: |
@@ -110,8 +136,18 @@ jobs:
 
       - name: Build AWS & GCP Images with Packer
         env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: us-east-1
+          GOOGLE_APPLICATION_CREDENTIALS: $HOME/gcp-key.json
           AWS_PROFILE: default
-        run: packer build .
+        run: |
+          if [[ ! -f "$GOOGLE_APPLICATION_CREDENTIALS" ]]; then
+            echo "❌ ERROR: GOOGLE_APPLICATION_CREDENTIALS file not found!"
+            exit 1
+          fi
+          packer build .
+        shell: bash
 
   update-launch-template:
     name: Update Launch Template
