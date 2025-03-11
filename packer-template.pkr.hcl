@@ -69,7 +69,7 @@ source "amazon-ebs" "ubuntu_custom_aws" {
 
 # GCP Source Configuration
 source "googlecompute" "ubuntu_custom_gcp" {
-  project_id          = var.gcp_project_id
+  project_id = var.gcp_project_id
   # credentials         = file(var.gcp_credentials_file)
   source_image_family = "ubuntu-2204-lts"
   zone                = "us-central1-a"
@@ -78,7 +78,7 @@ source "googlecompute" "ubuntu_custom_gcp" {
   image_family        = "custom-ubuntu"
   image_description   = "Custom Ubuntu 24.04 LTS with MySQL and Flask"
   ssh_username        = "ubuntu"
-}
+} 
 
 # Build Configuration
 build {
