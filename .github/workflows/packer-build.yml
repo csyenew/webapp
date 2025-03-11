@@ -75,16 +75,23 @@ jobs:
           GOOGLE_APPLICATION_CREDENTIALS_JSON: ${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}
         run: |
           echo "Decoding GCP credentials..."
-          echo "$GOOGLE_APPLICATION_CREDENTIALS_JSON" > gcp-key.json
-          export GOOGLE_APPLICATION_CREDENTIALS=$PWD/gcp-key.json
-          echo "Using GCP credentials from: $GOOGLE_APPLICATION_CREDENTIALS"
- 
-          # Debugging: Verify file exists
-          ls -l gcp-key.json
           
-          # Activate the service account
+          # Decode the Base64 secret before storing
+          echo "$GOOGLE_APPLICATION_CREDENTIALS_JSON" | base64 --decode > gcp-key.json
+          
+          # Set the environment variable for Packer & GCP
+          echo "GOOGLE_APPLICATION_CREDENTIALS=$PWD/gcp-key.json" >> $GITHUB_ENV
+          
+          echo "Using GCP credentials from: $GOOGLE_APPLICATION_CREDENTIALS"
+          
+          # Debugging: Verify the file exists and contains valid JSON
+          ls -l gcp-key.json || echo "gcp-key.json NOT FOUND!"
+          cat gcp-key.json | jq || echo "Invalid JSON!"
+
+          # Authenticate with GCP
           gcloud auth activate-service-account --key-file=gcp-key.json
           gcloud config set project "$(jq -r '.project_id' gcp-key.json)"
+
 
       - name: Build Application Artifact
         run: |
