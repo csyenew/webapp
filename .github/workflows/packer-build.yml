@@ -25,17 +25,14 @@ jobs:
           packer --version  # Verify installation
 
       - name: Run Packer Init
-        run: |
-          packer init .
+        run: packer init .
 
       - name: Run Packer Formatting Check
-        run: |
-          packer fmt .
+        run: packer fmt .
         continue-on-error: false
 
       - name: Run Packer Validate
-        run: |
-          packer validate .
+        run: packer validate .
         continue-on-error: false
 
   packer-build:
@@ -62,14 +59,6 @@ jobs:
           sudo mv packer /usr/local/bin/
           packer --version  # Verify installation
 
-      # - name: Install AWS CLI
-      #   if: matrix.platform == 'aws'
-      #   run: |
-      #     curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-      #     unzip awscliv2.zip
-      #     sudo ./aws/install --update
-      #     aws --version  # Verify installation
-
       - name: Configure AWS CLI
         if: matrix.platform == 'aws'
         run: |
@@ -80,42 +69,23 @@ jobs:
           echo "aws_secret_access_key=${{ secrets.AWS_SECRET_ACCESS_KEY }}" >> ~/.aws/credentials
           echo "region=us-east-1" >> ~/.aws/config
 
-      # - name: Install GCP CLI
-      #   if: matrix.platform == 'gcp'
-      #   run: |
-      #     sudo apt-get update && sudo apt-get install -y curl gnupg
-      #     echo "deb [signed-by=/usr/share/keyrings/cloud.google.com-archive-keyring.gpg] https://packages.cloud.google.com/apt cloud-sdk main" | sudo tee -a /etc/apt/sources.list.d/google-cloud-sdk.list
-      #     curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo tee /usr/share/keyrings/cloud.google.com-archive-keyring.gpg
-      #     sudo apt-get update && sudo apt-get install google-cloud-sdk
-      #     gcloud --version  # Verify installation
-
-      # - name: Decode and Store GCP Credentials
-      #   if: matrix.platform == 'gcp'
-      #   env:
-      #     GOOGLE_APPLICATION_CREDENTIALS_JSON: ${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}
-      #     GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
-      #   run: |
-      #     if [[ -z "$GOOGLE_APPLICATION_CREDENTIALS_JSON" ]]; then
-      #       echo "ERROR: GOOGLE_APPLICATION_CREDENTIALS_JSON is empty or missing!"
-      #       exit 1
-      #     fi
-      #     echo "$GOOGLE_APPLICATION_CREDENTIALS_JSON" > gcp-key.json
-      #     export GOOGLE_APPLICATION_CREDENTIALS=gcp-key.json
-      #     gcloud auth activate-service-account --key-file=gcp-key.json
-      #     gcloud config set project "$GCP_PROJECT_ID"
-
       - name: Decode and Store GCP Credentials
         if: matrix.platform == 'gcp'
         env:
           GOOGLE_APPLICATION_CREDENTIALS_JSON: ${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}
-          GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
         run: |
+          echo "Decoding GCP credentials..."
           echo "$GOOGLE_APPLICATION_CREDENTIALS_JSON" > gcp-key.json
-          export GOOGLE_APPLICATION_CREDENTIALS=gcp-key.json
-          gcloud auth activate-service-account --key-file=gcp-key.json
-          gcloud config set project "$GCP_PROJECT_ID"
+          export GOOGLE_APPLICATION_CREDENTIALS=$PWD/gcp-key.json
+          echo "Using GCP credentials from: $GOOGLE_APPLICATION_CREDENTIALS"
 
-       
+          # Debugging: Verify file exists
+          ls -l gcp-key.json
+          
+          # Activate the service account
+          gcloud auth activate-service-account --key-file=gcp-key.json
+          gcloud config set project "$(jq -r '.project_id' gcp-key.json)"
+
       - name: Build Application Artifact
         run: |
           zip -r app_artifact.zip app.py config.py packer-template.pkr.hcl requirements.txt webapp.service
