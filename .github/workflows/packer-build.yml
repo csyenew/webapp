@@ -120,7 +120,7 @@ jobs:
           # Authenticate with GCP 
           gcloud auth activate-service-account --key-file=gcp-key.json
           gcloud config set project ${{ secrets.GCP_PROJECT_ID }}
-        shell: /usr/bin/bash --noprofile --norc -e -o pipefail
+        shell: bash
 
       - name: Debug GCP Credentials File Before Packer
         if: matrix.platform == 'gcp'
@@ -154,7 +154,7 @@ jobs:
             exit 1
           fi
           packer build .
-        shell: /usr/bin/bash --noprofile --norc -e -o pipefail
+        shell: bash 
 
   update-launch-template:
     name: Update Launch Template
