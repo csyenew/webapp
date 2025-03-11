@@ -115,12 +115,19 @@ jobs:
       - name: Run Packer Init
         run: packer init .
 
-      - name: Build AWS & GCP Images with Packer
+      - name: Build AWS Image with Packer
+        if: matrix.platform == 'aws'
         env:
           AWS_PROFILE: default
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        run: packer build .
+        run: packer build -only=amazon-ebs.ubuntu_custom_aws .
+
+      - name: Build GCP Image with Packer
+        if: matrix.platform == 'gcp'
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: $HOME/gcp-key.json
+        run: packer build -only=googlecompute.ubuntu_custom_gcp .
 
   update-launch-template:
     name: Update Launch Template
