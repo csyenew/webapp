@@ -17,7 +17,7 @@ packer {
 # Define variables for AWS and GCP
 variable "aws_access_key" {
   type    = string
-  default = ""
+  default = "" 
 }
 
 variable "aws_secret_key" {
