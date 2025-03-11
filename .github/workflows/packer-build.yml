@@ -84,7 +84,17 @@ jobs:
           echo "[default]" > ~/.aws/config
           echo "aws_access_key_id=${{ secrets.AWS_ACCESS_KEY_ID }}" >> ~/.aws/credentials
           echo "aws_secret_access_key=${{ secrets.AWS_SECRET_ACCESS_KEY }}" >> ~/.aws/credentials
-          echo "region=us-east-1" >> ~/.aws/config
+          echo "region=us-east-1" >> ~/..aws/config
+
+      - name: Check AWS vCPU Quota
+        if: matrix.platform == 'aws'
+        run: |
+          vcpu_limit=$(aws service-quotas get-service-quota --service-code ec2 --quota-code L-1216C47A --query 'Quota.Value' --output text)
+          vcpu_usage=$(aws ec2 describe-instance-types --instance-types t2.micro --query 'InstanceTypes[0].VCpuInfo.DefaultVCpus' --output text)
+          if [ "$vcpu_usage" -ge "$vcpu_limit" ]; then
+            echo "Error: vCPU limit exceeded. Current usage: $vcpu_usage, Limit: $vcpu_limit"
+            exit 1
+          fi
 
       - name: Decode and Store GCP Credentials
         if: matrix.platform == 'gcp'
@@ -106,6 +116,16 @@ jobs:
 
           gcloud auth activate-service-account --key-file=$HOME/gcp-key.json
           gcloud config set project "$(jq -r '.project_id' $HOME/gcp-key.json)"
+
+      - name: Check GCP Address Quota
+        if: matrix.platform == 'gcp'
+        run: |
+          address_quota=$(gcloud compute regions describe us-central1 --format="value(quotas[metric=IN_USE_ADDRESSES].limit)")
+          address_usage=$(gcloud compute addresses list --filter="region:us-central1" --format="value(address)" | wc -l)
+          if [ "$address_usage" -ge "$address_quota" ]; then
+            echo "Error: Address quota exceeded. Current usage: $address_usage, Limit: $address_quota"
+            exit 1
+          fi
 
       - name: Build Application Artifact
         run: |
