@@ -126,7 +126,7 @@ jobs:
       - name: Build GCP Image with Packer
         if: matrix.platform == 'gcp'
         env:
-          GOOGLE_APPLICATION_CREDENTIALS: $HOME/gcp-key.json
+          GOOGLE_APPLICATION_CREDENTIALS: /home/runner/gcp-key.json
         run: packer build -only=googlecompute.ubuntu_custom_gcp .
 
   update-launch-template:
