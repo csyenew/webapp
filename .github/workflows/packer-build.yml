@@ -90,7 +90,7 @@ jobs:
         if: matrix.platform == 'aws'
         run: |
           vcpu_limit=$(aws service-quotas get-service-quota --service-code ec2 --quota-code L-1216C47A --query 'Quota.Value' --output text)
-          vcpu_usage=$(aws ec2 describe-instances --query 'Reservations[*].Instances[*].InstanceType' --output text | wc -l)
+          vcpu_usage=$(aws ec2 describe-instances --query 'Reservations[*].Instances[*].CpuOptions.CoreCount' --output text | awk '{s+=$1} END {print s}')
           if [ "$vcpu_usage" -ge "$vcpu_limit" ]; then
             echo "Error: vCPU limit exceeded. Current usage: $vcpu_usage, Limit: $vcpu_limit"
             exit 1
@@ -140,6 +140,7 @@ jobs:
           AWS_PROFILE: default
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          GOOGLE_APPLICATION_CREDENTIALS: $HOME/gcp-key.json
         run: packer build .
 
   update-launch-template:
