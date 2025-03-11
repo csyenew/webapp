@@ -115,8 +115,6 @@ source "googlecompute" "ubuntu_custom_gcp" {
   ssh_username        = "ubuntu"
 }
 
-
-
 # Build Configuration
 build {
   sources = [
@@ -128,13 +126,22 @@ build {
     inline = [
       "export DEBIAN_FRONTEND=noninteractive",
       "sudo apt-get update -y && sudo apt-get upgrade -y",
+
+      # Fix for MySQL dependency issues
+      "sudo apt-get install -y software-properties-common gnupg",
+      "sudo add-apt-repository universe -y",
+      "wget https://dev.mysql.com/get/mysql-apt-config_0.8.20-1_all.deb",
+      "sudo dpkg -i mysql-apt-config_0.8.20-1_all.deb",
+      "sudo apt-get update -y",
+
+      # Install MySQL with dependencies
       "sudo apt-get install -y mysql-server mysql-client python3-pip python3-venv",
 
-      # MySQL Setup
+      # Enable and start MySQL service
       "sudo systemctl enable mysql",
       "sudo systemctl start mysql",
 
-      # Create user csye6225
+      # Create user
       "sudo groupadd csye6225 || true",
       "sudo useradd -r -m -s /usr/sbin/nologin -g csye6225 csye6225 || true",
 
@@ -146,7 +153,7 @@ build {
     ]
   }
 
-  # Create systemd service file using heredoc
+  # Create systemd service for Flask app
   provisioner "shell" {
     inline = [
       "cat <<EOF | sudo tee /etc/systemd/system/webapp.service",
@@ -170,7 +177,7 @@ build {
     ]
   }
 
-  # Enable and start the service
+  # Enable and start Flask service
   provisioner "shell" {
     inline = [
       "sudo systemctl daemon-reload",
@@ -183,7 +190,9 @@ build {
   provisioner "shell" {
     inline = [
       "sudo apt-get install -f -y",  # Fix any missing dependencies
-      "sudo apt-get autoremove -y",  # Clean up unused packages
+      "sudo apt-mark unhold mysql-common",
+      "sudo apt-mark unhold mysql-server-core-8.0",
+      "sudo apt-get autoremove -y",
       "sudo apt-get clean"
     ]
   }
