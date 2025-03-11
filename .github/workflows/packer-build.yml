@@ -42,6 +42,7 @@ jobs:
       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       AWS_DEFAULT_REGION: us-east-1
+      GOOGLE_APPLICATION_CREDENTIALS: ${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}
     strategy:
       matrix:
         platform: [aws, gcp]  # Build images for AWS and GCP in parallel
@@ -69,35 +70,31 @@ jobs:
           echo "aws_secret_access_key=${{ secrets.AWS_SECRET_ACCESS_KEY }}" >> ~/.aws/credentials
           echo "region=us-east-1" >> ~/.aws/config
 
-      - name: Decode and Store GCP Credentials
+      - name: Configure GCP Authentication
         if: matrix.platform == 'gcp'
-        env:
-          GOOGLE_APPLICATION_CREDENTIALS_JSON: ${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}
         run: |
-          echo "🔍 Checking if GCP Credentials Secret Exists..."
-          
-          if [[ -z "$GOOGLE_APPLICATION_CREDENTIALS_JSON" ]]; then
-            echo "❌ ERROR: GOOGLE_APPLICATION_CREDENTIALS_JSON is empty!"
+          echo "🔍 Setting up GCP authentication..."
+
+          # Ensure the secret exists
+          if [[ -z "$GOOGLE_APPLICATION_CREDENTIALS" ]]; then
+            echo "❌ ERROR: GOOGLE_APPLICATION_CREDENTIALS is empty!"
             exit 1
           fi
 
-          # Decode the JSON key file and store it in $HOME
-          echo "$GOOGLE_APPLICATION_CREDENTIALS_JSON" | base64 --decode > $HOME/gcp-key.json
+          # Store credentials in a file
+          echo "$GOOGLE_APPLICATION_CREDENTIALS" | base64 --decode > "$HOME/gcp-key.json"
 
-          # Set the environment variable to use the decoded key
+          # Export the credentials file path
           echo "GOOGLE_APPLICATION_CREDENTIALS=$HOME/gcp-key.json" >> $GITHUB_ENV
-          export GOOGLE_APPLICATION_CREDENTIALS=$HOME/gcp-key.json
+          export GOOGLE_APPLICATION_CREDENTIALS="$HOME/gcp-key.json"
 
           echo "✅ GCP credentials saved to: $GOOGLE_APPLICATION_CREDENTIALS"
-          
-          # Verify the file exists
-          ls -l $GOOGLE_APPLICATION_CREDENTIALS || echo "❌ gcp-key.json NOT FOUND!"
 
           # Verify JSON validity
-          cat $GOOGLE_APPLICATION_CREDENTIALS | jq . || echo "❌ Invalid JSON!"
+          cat "$GOOGLE_APPLICATION_CREDENTIALS" | jq . || echo "❌ Invalid JSON!"
 
           # Authenticate with GCP
-          gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS
+          gcloud auth activate-service-account --key-file="$GOOGLE_APPLICATION_CREDENTIALS"
           gcloud config set project "$(jq -r '.project_id' $GOOGLE_APPLICATION_CREDENTIALS)"
 
       - name: Debug GCP Authentication Before Packer
@@ -106,9 +103,9 @@ jobs:
           echo "🔍 Checking Environment Variables"
           echo "GOOGLE_APPLICATION_CREDENTIALS: $GOOGLE_APPLICATION_CREDENTIALS"
           
-          ls -l $GOOGLE_APPLICATION_CREDENTIALS || echo "❌ Credential file not found!"
+          ls -l "$GOOGLE_APPLICATION_CREDENTIALS" || echo "❌ Credential file not found!"
           
-          cat $GOOGLE_APPLICATION_CREDENTIALS | jq . || echo "❌ Invalid JSON!"
+          cat "$GOOGLE_APPLICATION_CREDENTIALS" | jq . || echo "❌ Invalid JSON!"
           
           echo "🔍 Running GCP Authentication Test..."
           gcloud auth list
