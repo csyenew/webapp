@@ -116,7 +116,6 @@ source "googlecompute" "ubuntu_custom_gcp" {
 }
 
 # Build Configuration
-# Build Configuration
 build {
   sources = [
     "source.amazon-ebs.ubuntu_custom_aws",
@@ -126,18 +125,23 @@ build {
   provisioner "shell" {
     inline = [
       "export DEBIAN_FRONTEND=noninteractive",
-      "sudo apt-get update -y && sudo apt-get upgrade -y",
-      "sudo apt-get install -y mysql-server mysql-client python3-pip python3-venv",
+      "sudo apt-get update -y && sudo apt-get install -y lsb-release gnupg curl",
 
-      # MySQL Setup
+      # Add MySQL repository
+      "curl -sS https://dev.mysql.com/get/mysql-apt-config_0.8.22-1_all.deb -o mysql-apt-config.deb",
+      "sudo dpkg -i mysql-apt-config.deb",
+      "sudo apt-get update -y",
+
+      # Install MySQL
+      "sudo apt-get install -y mysql-server mysql-client",
+
+      # Start MySQL
       "sudo systemctl enable mysql",
       "sudo systemctl start mysql",
 
-      # Create user csye6225
+      # Setup Flask App
       "sudo groupadd csye6225 || true",
       "sudo useradd -r -m -s /usr/sbin/nologin -g csye6225 csye6225 || true",
-
-      # Setup Flask App
       "sudo mkdir -p /home/csye6225/webapp",
       "sudo chown -R csye6225:csye6225 /home/csye6225/webapp",
       "sudo -u csye6225 python3 -m venv /home/csye6225/webapp/venv",
