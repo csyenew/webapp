@@ -70,7 +70,7 @@ jobs:
           echo "aws_secret_access_key=${{ secrets.AWS_SECRET_ACCESS_KEY }}" >> ~/.aws/credentials
           echo "region=us-east-1" >> ~/.aws/config
 
-            - name: Configure GCP Authentication
+      - name: Configure GCP Authentication
         if: matrix.platform == 'gcp'
         env:
           GOOGLE_APPLICATION_CREDENTIALS_JSON: ${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}
