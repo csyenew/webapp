@@ -36,7 +36,7 @@ variable "instance_type" {
 
 variable "ssh_username" {
   type    = string
-  default = "ubuntu"
+  default = "ec2-user"
 }
 
 variable "subnet_id" {
@@ -122,19 +122,30 @@ build {
     "source.googlecompute.ubuntu_custom_gcp"
   ]
 
-  # Install MySQL & Dependencies from Ubuntu's Official Repo (No mysql-apt-config needed)
+  # Ensure package lists are reset and update the system
   provisioner "shell" {
     inline = [
       "export DEBIAN_FRONTEND=noninteractive",
 
-      # Ensure system is updated
+      # Clean and reset APT sources
+      "sudo apt-get clean",
+      "sudo rm -rf /var/lib/apt/lists/*",
       "sudo apt-get update -y",
       "sudo apt-get upgrade -y",
+      "sudo apt-get install -f -y",
+      "sudo dpkg --configure -a"
+    ]
+  }
 
-      # Install MySQL directly from Ubuntu official repo
+  # Install MySQL and required dependencies
+  provisioner "shell" {
+    inline = [
+      "export DEBIAN_FRONTEND=noninteractive",
+
+      # Install MySQL from Ubuntu's default repositories
       "sudo apt-get install -y mysql-server mysql-client python3-pip python3-venv",
 
-      # Ensure MySQL starts properly
+      # Ensure MySQL starts on boot
       "sudo systemctl enable mysql",
       "sudo systemctl start mysql",
 
