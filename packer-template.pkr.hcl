@@ -1,3 +1,4 @@
+# Define required Packer version
 packer {
   required_version = ">= 1.8.0"
 
@@ -13,109 +14,46 @@ packer {
   }
 }
 
-# AWS Variables
-variable "ami_users" {
-  type    = list(string)
-  default = ["434369415270", "610018956402"]
-}
-
-variable "region" {
-  type    = string
+# Define variables for AWS and GCP
+variable "aws_region" {
   default = "us-east-1"
 }
 
-variable "source_ami" {
-  type    = string
-  default = "ami-06db4d78cb1d3bbf9"  # Ubuntu AMI
-}
-
-variable "instance_type" {
-  type    = string
-  default = "t2.micro"
-}
-
-variable "ssh_username" {
-  type    = string
-  default = "admin"  # Ubuntu default user
-}
-
-variable "subnet_id" {
-  type    = string
-  default = "subnet-0d0c161f44f4f4ae8"
-}
-
-variable "vpc_id" {
-  type    = string
-  default = "vpc-0edcd255c0595a650"
-}
-
-variable "ami_name" {
-  type    = string
-  default = "webapp-ami"
-}
-
-variable "environment" {
-  type    = string
-  default = "dev"
-}
-
-# GCP Variables
 variable "gcp_project_id" {
-  type    = string
   default = "csye-dev-451921-452108"
 }
 
-variable "gcp_credentials_file" {
-  type    = string
-  default = "gcp-key.json"
-}
-
-variable "artifact_path" {
-  type    = string
-  default = "app_artifact.zip"
-}
-
-locals {
-  timestamp = regex_replace(timestamp(), "[- TZ:]", "")
-}
-
-# AWS Source Configuration
+# AWS Source Configuration (Ubuntu Custom for AWS)
 source "amazon-ebs" "ubuntu_custom_aws" {
-  region        = var.region
-  ami_name      = "${var.ami_name}-${local.timestamp}"
-  ami_users     = var.ami_users
-  instance_type = var.instance_type
-  source_ami    = var.source_ami
-  ssh_username  = var.ssh_username
-  subnet_id     = var.subnet_id
-  vpc_id        = var.vpc_id
-
-  encrypt_boot = false
-
-  tags = {
-    Name        = "${var.ami_name}-${local.timestamp}"
-    Environment = var.environment
+  region = var.aws_region
+  source_ami_filter {
+    filters = {
+      name                = "ubuntu/images/*ubuntu-jammy-22.04-amd64-server-*"
+      virtualization-type = "hvm"
+      root-device-type    = "ebs"
+    }
+    most_recent = true
+    owners      = ["099720109477"]
   }
-
-  launch_block_device_mappings {
-    device_name           = "/dev/xvda"
-    delete_on_termination = true
-  }
+  ssh_username    = "ubuntu"
+  instance_type   = "t2.micro"
+  ami_name        = "ubuntu-custom-{{timestamp}}"
+  ami_description = "Custom Ubuntu 22.04 with MySQL and Flask"
+  encrypt_boot    = true
 }
 
-# GCP Source Configuration
+# GCP Source Configuration (Ubuntu Custom for GCP)
 source "googlecompute" "ubuntu_custom_gcp" {
   project_id          = var.gcp_project_id
-  source_image_family = "ubuntu-2204-lts"
+  source_image_family = "ubuntu-2404-lts-amd64"
   zone                = "us-central1-a"
   machine_type        = "e2-micro"
-  image_name          = "custom-ubuntu-24-${local.timestamp}"
+  image_name          = "custom-ubuntu-24-{{timestamp}}"
   image_family        = "custom-ubuntu"
   image_description   = "Custom Ubuntu 24.04 LTS with MySQL and Flask"
   ssh_username        = "ubuntu"
 }
 
-# Build Configuration
 # Build Configuration for AWS and GCP
 build {
   sources = [
@@ -184,49 +122,4 @@ build {
 }
 
 
-
-
-
-
-  // Create systemd service file using heredoc
-  provisioner "shell" {
-    inline = [
-      "cat <<EOF | sudo tee /etc/systemd/system/webapp.service",
-      "[Unit]",
-      "Description=Flask Web Application",
-      "After=network.target",
-      "",
-      "[Service]",
-      "User=csye6225",
-      "Group=csye6225",
-      "WorkingDirectory=/home/csye6225/webapp",
-      "ExecStart=/home/csye6225/webapp/venv/bin/python /home/csye6225/webapp/app.py",
-      "Restart=always",
-      "Environment=FLASK_APP=app.py",
-      "Environment=FLASK_ENV=production",
-      "Environment=PATH=/home/csye6225/webapp/venv/bin:$PATH",
-      "",
-      "[Install]",
-      "WantedBy=multi-user.target",
-      "EOF"
-    ]
-  }
-
-  // Enable and start the service
-  provisioner "shell" {
-    inline = [
-      "sudo systemctl daemon-reload",
-      "sudo systemctl enable webapp.service",
-      "sudo systemctl start webapp.service"
-    ]
-  }
-
-  // Fix broken packages and clean up
-  provisioner "shell" {
-    inline = [
-      "sudo apt-get install -f -y",  // Fix any missing dependencies
-      "sudo apt-get autoremove -y",  // Clean up unused packages
-      "sudo apt-get clean"
-    ]
-  }
 }
