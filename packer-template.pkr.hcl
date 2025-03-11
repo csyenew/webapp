@@ -3,11 +3,11 @@ packer {
 
   required_plugins {
     amazon = {
-      source  = "hashicorp/amazon"
+      source  = "github.com/hashicorp/amazon"
       version = ">= 1.0.0"
     }
     googlecompute = {
-      source  = "hashicorp/googlecompute"
+      source  = "github.com/hashicorp/googlecompute"
       version = ">= 1.0.0"
     }
   }
@@ -89,7 +89,8 @@ source "amazon-ebs" "ubuntu_custom_aws" {
   ssh_username  = var.ssh_username
   subnet_id     = var.subnet_id
   vpc_id        = var.vpc_id
-  encrypt_boot  = true
+
+  encrypt_boot  = false  # ✅ FIX: Disable encryption to allow sharing
 
   tags = {
     Name        = "${var.ami_name}-${local.timestamp}"
@@ -102,10 +103,10 @@ source "amazon-ebs" "ubuntu_custom_aws" {
   }
 }
 
+
 # GCP Source Configuration
 source "googlecompute" "ubuntu_custom_gcp" {
   project_id          = var.gcp_project_id
-  credentials         = file(var.gcp_credentials_file)
   source_image_family = "ubuntu-2204-lts"
   zone                = "us-central1-a"
   machine_type        = "e2-micro"
@@ -177,3 +178,4 @@ build {
     ]
   }
 }
+ 
