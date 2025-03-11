@@ -36,13 +36,8 @@ jobs:
         continue-on-error: false
 
   packer-build:
-    needs: [packer-fmt-validate]  # Ensure validation passes before building
+    needs: [packer-fmt-validate]
     runs-on: ubuntu-latest
-    env:
-      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-      AWS_DEFAULT_REGION: us-east-1
-      GOOGLE_APPLICATION_CREDENTIALS: ${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}
     strategy:
       matrix:
         platform: [aws, gcp]  # Build images for AWS and GCP in parallel
@@ -60,103 +55,89 @@ jobs:
           sudo mv packer /usr/local/bin/
           packer --version  # Verify installation
 
+      # ✅ Configure AWS CLI for AWS builds
       - name: Configure AWS CLI
         if: matrix.platform == 'aws'
         run: |
           mkdir -p ~/.aws
           echo "[default]" > ~/.aws/credentials
-          echo "[default]" > ~/.aws/config
           echo "aws_access_key_id=${{ secrets.AWS_ACCESS_KEY_ID }}" >> ~/.aws/credentials
           echo "aws_secret_access_key=${{ secrets.AWS_SECRET_ACCESS_KEY }}" >> ~/.aws/credentials
+          echo "[default]" > ~/.aws/config
           echo "region=us-east-1" >> ~/.aws/config
 
-      - name: Configure GCP Authentication
+      # ✅ Store and Validate GCP Credentials
+      - name: Store GCP Credentials
         if: matrix.platform == 'gcp'
-        env:
-          GOOGLE_APPLICATION_CREDENTIALS_JSON: ${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}
         run: |
-          echo "🔍 Setting up GCP authentication..."
-
-          # Ensure the secret exists
-          if [[ -z "$GOOGLE_APPLICATION_CREDENTIALS_JSON" ]]; then
+          if [[ -z "${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}" ]]; then
             echo "❌ ERROR: GOOGLE_APPLICATION_CREDENTIALS_JSON is empty!"
             exit 1
           fi
 
-          # Decode the secret and store it in a file
-          echo "$GOOGLE_APPLICATION_CREDENTIALS_JSON" | base64 --decode > "$HOME/gcp-key.json"
+          echo '${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}' > $HOME/gcp-key.json
 
-          # Ensure the file exists
           if [[ ! -f "$HOME/gcp-key.json" ]]; then
-            echo "❌ ERROR: Credentials file not found at $HOME/gcp-key.json"
+            echo "❌ ERROR: gcp-key.json file was not created!"
             exit 1
           fi
 
-          # Validate JSON format
-          if ! jq empty "$HOME/gcp-key.json" >/dev/null 2>&1; then
+          if ! jq empty "$HOME/gcp-key.json" > /dev/null 2>&1; then
             echo "❌ ERROR: Invalid JSON in gcp-key.json!"
             exit 1
           fi
 
-          echo "✅ GCP credentials stored successfully at: $HOME/gcp-key.json"
-          ls -l "$HOME/gcp-key.json"
-
-          # Set environment variable for later steps
           echo "GOOGLE_APPLICATION_CREDENTIALS=$HOME/gcp-key.json" >> $GITHUB_ENV
+          echo "✅ GCP credentials stored successfully."
 
-      - name: Decode and Store GCP Credentials
-        run: |
-          if [[ -z "${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}" ]]; then
-            echo "ERROR: GOOGLE_APPLICATION_CREDENTIALS_JSON is empty or missing!"
-            exit 1
-          fi
-          
-          echo "${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}" | base64 --decode > gcp-key.json
-          
-          # Debugging: Ensure the file is not empty
-          echo "First 100 characters of gcp-key.json:"
-          head -c 100 gcp-key.json || echo "ERROR: gcp-key.json is empty!"
-          
-          # Authenticate with GCP 
-          gcloud auth activate-service-account --key-file=gcp-key.json
-          gcloud config set project ${{ secrets.GCP_PROJECT_ID }}
-        shell: bash
-
-      - name: Debug GCP Credentials File Before Packer
+      # ✅ Debug GCP Credentials File Before Packer
+      - name: Debug GCP Credentials File
         if: matrix.platform == 'gcp'
         run: |
-          echo "🔍 Checking GOOGLE_APPLICATION_CREDENTIALS"
+          echo "🔍 Checking GOOGLE_APPLICATION_CREDENTIALS variable..."
           echo "GOOGLE_APPLICATION_CREDENTIALS: $GOOGLE_APPLICATION_CREDENTIALS"
-
-          ls -l "$GOOGLE_APPLICATION_CREDENTIALS" || echo "❌ Credential file not found!"
           
-          cat "$GOOGLE_APPLICATION_CREDENTIALS" | jq . || echo "❌ Invalid JSON!"
+          echo "🔍 Listing stored key file..."
+          ls -l $HOME/gcp-key.json || echo "❌ gcp-key.json not found!"
+          
+          echo "🔍 First 100 characters of key file:"
+          head -c 100 $HOME/gcp-key.json || echo "❌ gcp-key.json is empty!"
+          
+          echo "🔍 Validating JSON format..."
+          cat $HOME/gcp-key.json | jq . || echo "❌ Invalid JSON!"
 
-
+      # ✅ Build the Application Artifact
       - name: Build Application Artifact
         run: |
           zip -r app_artifact.zip app.py config.py packer-template.pkr.hcl requirements.txt webapp.service
           echo "Artifact built successfully"
 
+      # ✅ Run Packer Init
       - name: Run Packer Init
         run: packer init .
 
-      - name: Build AWS & GCP Images with Packer
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_DEFAULT_REGION: us-east-1
-          GOOGLE_APPLICATION_CREDENTIALS: /home/runner/gcp-key.json
-          AWS_PROFILE: default
+      # ✅ Ensure GCP Credentials Exist Before Packer Build
+      - name: Ensure GCP Credentials Exist Before Packer Build
+        if: matrix.platform == 'gcp'
         run: |
+          if [[ ! -f "$HOME/gcp-key.json" ]]; then
+            echo "❌ ERROR: gcp-key.json file not found!"
+            exit 1
+          fi
+          echo "GOOGLE_APPLICATION_CREDENTIALS=$HOME/gcp-key.json" >> $GITHUB_ENV
+          echo "✅ GCP credentials ready for Packer."
+
+      # ✅ Run Packer Build for AWS & GCP
+      - name: Build AWS & GCP Images with Packer
+        run: |
+          echo "Using GOOGLE_APPLICATION_CREDENTIALS: $GOOGLE_APPLICATION_CREDENTIALS"
           if [[ ! -f "$GOOGLE_APPLICATION_CREDENTIALS" ]]; then
             echo "❌ ERROR: GOOGLE_APPLICATION_CREDENTIALS file not found!"
             exit 1
           fi
           packer build .
-        shell: bash 
-
-  update-launch-template: 
+      
+  update-launch-template:
     name: Update Launch Template
     runs-on: ubuntu-latest
     needs: [packer-build]
@@ -171,6 +152,6 @@ jobs:
             --source-version ${{ env.version_number }}
 
       - name: Start AWS Auto Scaling Group Refresh
-        run: | 
+        run: |
           aws autoscaling start-instance-refresh --auto-scaling-group-name csye6225-asg-spring2023 --strategy Rolling \
             --desired-configuration '{"LaunchTemplate": {"LaunchTemplateName":"asg_launch_config", "Version":"$Latest"}}'
