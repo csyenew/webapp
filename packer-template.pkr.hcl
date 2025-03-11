@@ -124,65 +124,72 @@ build {
 
   provisioner "shell" {
     inline = [
-      # Set non-interactive mode to avoid prompts
-      "echo 'export DEBIAN_FRONTEND=noninteractive' | sudo tee -a /etc/environment",
       "export DEBIAN_FRONTEND=noninteractive",
-      
-      # Update package lists
-      "sudo apt-get update -y",
-
-      # Install required dependencies
+      "sudo apt-get update -y && sudo apt-get upgrade -y",
       "sudo apt-get install -y wget lsb-release gnupg curl",
 
-      # Add MySQL's official public GPG key (Fixes NO_PUBKEY error)
-      "wget -qO - https://repo.mysql.com/RPM-GPG-KEY-mysql-2022 | sudo tee /usr/share/keyrings/mysql-archive-keyring.gpg",
-
-      # Manually configure MySQL APT repository (Use Debian Bullseye as Bookworm is not supported)
-      "echo 'deb [signed-by=/usr/share/keyrings/mysql-archive-keyring.gpg] http://repo.mysql.com/apt/debian bullseye mysql-8.0' | sudo tee /etc/apt/sources.list.d/mysql.list",
-
-      # Update package lists after adding MySQL repository
+      // Add MySQL APT repository and its public key
+      "wget https://dev.mysql.com/get/mysql-apt-config_0.8.17-1_all.deb",
+      "sudo dpkg -i mysql-apt-config_0.8.17-1_all.deb",
+      "wget -qO - https://repo.mysql.com/RPM-GPG-KEY-mysql-2022 | sudo apt-key add -",
       "sudo apt-get update -y",
+      "sudo apt-get install -y mysql-server mysql-client python3-pip python3-venv",
 
-      # Install MySQL Server and Client
-      "sudo apt-get install -y mysql-server mysql-client",
-
-      # Enable and start MySQL service
+      // MySQL Setup
       "sudo systemctl enable mysql",
       "sudo systemctl start mysql",
 
-      # Secure MySQL Installation - Change root password
-      "echo \"ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY 'password'; FLUSH PRIVILEGES;\" | sudo mysql",
-
-      # Setup Flask App
+      // Create user csye6225
       "sudo groupadd csye6225 || true",
       "sudo useradd -r -m -s /usr/sbin/nologin -g csye6225 csye6225 || true",
+
+      // Setup Flask App
       "sudo mkdir -p /home/csye6225/webapp",
       "sudo chown -R csye6225:csye6225 /home/csye6225/webapp",
       "sudo -u csye6225 python3 -m venv /home/csye6225/webapp/venv",
-      "sudo -u csye6225 /home/csye6225/webapp/venv/bin/pip install Flask Flask-SQLAlchemy Flask-Migrate python-dotenv mysql-connector-python werkzeug pytest",
+      "sudo -u csye6225 /home/csye6225/webapp/venv/bin/pip install Flask Flask-SQLAlchemy Flask-Migrate python-dotenv mysql-connector-python werkzeug pytest"
+    ]
+  }
 
-      # Create systemd service for Flask app
-      "echo '[Unit]' | sudo tee /etc/systemd/system/webapp.service",
-      "echo 'Description=Flask Web Application' | sudo tee -a /etc/systemd/system/webapp.service",
-      "echo 'After=network.target' | sudo tee -a /etc/systemd/system/webapp.service",
+  // Create systemd service file using heredoc
+  provisioner "shell" {
+    inline = [
+      "cat <<EOF | sudo tee /etc/systemd/system/webapp.service",
+      "[Unit]",
+      "Description=Flask Web Application",
+      "After=network.target",
       "",
-      "echo '[Service]' | sudo tee -a /etc/systemd/system/webapp.service",
-      "echo 'User=csye6225' | sudo tee -a /etc/systemd/system/webapp.service",
-      "echo 'Group=csye6225' | sudo tee -a /etc/systemd/system/webapp.service",
-      "echo 'WorkingDirectory=/home/csye6225/webapp' | sudo tee -a /etc/systemd/system/webapp.service",
-      "echo 'ExecStart=/home/csye6225/webapp/venv/bin/python /home/csye6225/webapp/app.py' | sudo tee -a /etc/systemd/system/webapp.service",
-      "echo 'Restart=always' | sudo tee -a /etc/systemd/system/webapp.service",
-      "echo 'Environment=FLASK_APP=app.py' | sudo tee -a /etc/systemd/system/webapp.service",
-      "echo 'Environment=FLASK_ENV=production' | sudo tee -a /etc/systemd/system/webapp.service",
-      "echo 'Environment=PATH=/home/csye6225/webapp/venv/bin:$PATH' | sudo tee -a /etc/systemd/system/webapp.service",
+      "[Service]",
+      "User=csye6225",
+      "Group=csye6225",
+      "WorkingDirectory=/home/csye6225/webapp",
+      "ExecStart=/home/csye6225/webapp/venv/bin/python /home/csye6225/webapp/app.py",
+      "Restart=always",
+      "Environment=FLASK_APP=app.py",
+      "Environment=FLASK_ENV=production",
+      "Environment=PATH=/home/csye6225/webapp/venv/bin:$PATH",
       "",
-      "echo '[Install]' | sudo tee -a /etc/systemd/system/webapp.service",
-      "echo 'WantedBy=multi-user.target' | sudo tee -a /etc/systemd/system/webapp.service",
+      "[Install]",
+      "WantedBy=multi-user.target",
+      "EOF"
+    ]
+  }
 
-      # Enable and start Flask service
+  // Enable and start the service
+  provisioner "shell" {
+    inline = [
       "sudo systemctl daemon-reload",
-      "sudo systemctl enable webapp",
-      "sudo systemctl start webapp"
+      "sudo systemctl enable webapp.service",
+      "sudo systemctl start webapp.service"
+    ]
+  }
+
+  // Fix broken packages and clean up
+  provisioner "shell" {
+    inline = [
+      "sudo apt-get install -f -y",  // Fix any missing dependencies
+      "sudo apt-get autoremove -y",  // Clean up unused packages
+      "sudo apt-get clean"
     ]
   }
 }
