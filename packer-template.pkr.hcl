@@ -70,7 +70,7 @@ source "amazon-ebs" "ubuntu_custom_aws" {
 # GCP Source Configuration
 source "googlecompute" "ubuntu_custom_gcp" {
   project_id          = var.gcp_project_id
-  credentials         = file(var.gcp_credentials_file)
+  # credentials         = file(var.gcp_credentials_file)
   source_image_family = "ubuntu-2204-lts"
   zone                = "us-central1-a"
   machine_type        = "e2-micro"
