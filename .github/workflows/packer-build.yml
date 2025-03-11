@@ -55,10 +55,10 @@ jobs:
           sudo ./aws/install --update
           aws --version
 
-      - name: Install GCP SDK
+      - name: Install GCP CLI
         run: |
           sudo apt-get update
-          sudo apt-get install -y google-cloud-sdk
+          sudo apt-get install -y google-cloud-cli
           gcloud --version
 
       - name: Install MySQL
