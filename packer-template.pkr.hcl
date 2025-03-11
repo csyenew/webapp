@@ -36,7 +36,7 @@ variable "instance_type" {
 
 variable "ssh_username" {
   type    = string
-  default = "ec2-user"
+  default = "ubuntu"
 }
 
 variable "subnet_id" {
@@ -122,36 +122,58 @@ build {
     "source.googlecompute.ubuntu_custom_gcp"
   ]
 
-  # Ensure package lists are reset and update the system
+  # Remove broken MySQL dependencies & fix package manager issues
   provisioner "shell" {
     inline = [
       "export DEBIAN_FRONTEND=noninteractive",
 
-      # Clean and reset APT sources
+      # Remove any existing MySQL packages
+      "sudo apt-get remove --purge mysql-server mysql-client mysql-common mysql-server-core-* mysql-client-core-* -y",
+      "sudo rm -rf /var/lib/mysql /etc/mysql",
+
+      # Reset APT package lists and fix dependencies
       "sudo apt-get clean",
-      "sudo rm -rf /var/lib/apt/lists/*",
+      "sudo rm -rf /var/lib/apt/lists/\\*",
       "sudo apt-get update -y",
       "sudo apt-get upgrade -y",
       "sudo apt-get install -f -y",
-      "sudo dpkg --configure -a"
+      "sudo dpkg --configure -a",
+
+      # Enable universe repository (required for some packages)
+      "sudo add-apt-repository universe -y",
+      "sudo apt-get update -y"
     ]
   }
 
-  # Install MySQL and required dependencies
+  # Install MySQL 8.0 from Ubuntu’s official repository
   provisioner "shell" {
     inline = [
       "export DEBIAN_FRONTEND=noninteractive",
 
-      # Install MySQL from Ubuntu's default repositories
-      "sudo apt-get install -y mysql-server mysql-client python3-pip python3-venv",
+      # Install MySQL from Ubuntu’s repository
+      "sudo apt-get install -y mysql-server mysql-client",
 
-      # Ensure MySQL starts on boot
+      # Ensure MySQL starts properly
       "sudo systemctl enable mysql",
       "sudo systemctl start mysql",
 
-      # Secure MySQL installation (disable interactive mode)
+      # Secure MySQL installation (set root password)
       "sudo mysql -e \"ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY 'root';\"",
       "sudo mysql -e \"FLUSH PRIVILEGES;\""
+    ]
+  }
+
+  # Install Python 3 and required dependencies
+  provisioner "shell" {
+    inline = [
+      "export DEBIAN_FRONTEND=noninteractive",
+      
+      # Install correct Python version
+      "sudo apt-get install -y python3 python3-pip python3-venv",
+
+      # Verify installation
+      "python3 --version",
+      "pip3 --version"
     ]
   }
 
