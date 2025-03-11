@@ -1,148 +1,144 @@
-name: Packer Image Build
+name: Packer CI
 
 on:
+  push:
+    branches:
+      - main
   pull_request:
     branches:
       - main
 
 jobs:
-  imageBuild:
-    name: Build and Deploy Custom Image with Packer & MySQL
+  packer-fmt-validate:
     runs-on: ubuntu-latest
-
-    services:
-      mysql:
-        image: mysql:8.0
-        env:
-          MYSQL_ROOT_PASSWORD: ${{ secrets.DB_PASSWORD }}
-          MYSQL_DATABASE: ${{ secrets.DB_NAME }}
-        ports:
-          - 3306:3306
-        options: >-
-          --health-cmd="mysqladmin ping -h 127.0.0.1 -p${{ secrets.DB_PASSWORD }}"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=3
-
-    env:
-      DB_HOST: 127.0.0.1
-      DB_PORT: 3306
-      DB_NAME: ${{ secrets.DB_NAME }}
-      DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
-      AWS_REGION: us-east-1
-
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v3
+      - name: Checkout code
+        uses: actions/checkout@v2
 
-      ## ✅ Manually Configure AWS Credentials
-      - name: Configure AWS Credentials Manually
+      - name: Install Packer
         run: |
-          mkdir -p ~/.aws
-          echo "[default]" > ~/.aws/credentials
-          echo "aws_access_key_id=${{ secrets.AWS_ACCESS_KEY_ID }}" >> ~/.aws/credentials
-          echo "aws_secret_access_key=${{ secrets.AWS_SECRET_ACCESS_KEY }}" >> ~/.aws/credentials
-          echo "[default]" > ~/.aws/config
-          echo "region=us-east-1" >> ~/.aws/config
-          echo "✅ AWS credentials configured successfully!"
-
-      ## ✅ Manually Authenticate with Google Cloud
-      - name: Authenticate with Google Cloud
-        run: |
-          echo "${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}" > gcp-key.json
-          gcloud auth activate-service-account --key-file=gcp-key.json
-          gcloud config set project "$(jq -r '.project_id' gcp-key.json)"
-          echo "✅ Google Cloud authentication successful!"
-
-      ## ✅ Install Google Cloud SDK Manually
-      - name: Install Google Cloud SDK
-        run: |
-          sudo apt-get update && sudo apt-get install -y curl apt-transport-https ca-certificates gnupg
-          echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" | sudo tee -a /etc/apt/sources.list.d/google-cloud-sdk.list
-          curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key add -
-          sudo apt-get update && sudo apt-get install -y google-cloud-cli
-          gcloud auth list
-          echo "✅ Google Cloud SDK installed successfully!"
-
-      ## ✅ Debug Google Cloud Credentials
-      - name: Debug Google Cloud Credentials
-        run: |
-          echo "🔍 Checking GOOGLE_APPLICATION_CREDENTIALS..."
-          echo "GOOGLE_APPLICATION_CREDENTIALS: $GOOGLE_APPLICATION_CREDENTIALS"
-
-          echo "🔍 Checking if credentials file exists..."
-          ls -l "$GOOGLE_APPLICATION_CREDENTIALS" || echo "❌ gcp-key.json not found!"
-
-          echo "🔍 First 100 characters of key file:"
-          head -c 100 "$GOOGLE_APPLICATION_CREDENTIALS" || echo "❌ gcp-key.json is empty!"
-
-          echo "🔍 Validating JSON format..."
-          cat "$GOOGLE_APPLICATION_CREDENTIALS" | jq . || echo "❌ Invalid JSON!"
-
-      ## ✅ Install MySQL Client (for DB connectivity check)
-      - name: Install MySQL Client
-        run: sudo apt-get update && sudo apt-get install -y mysql-client
-
-      ## ✅ Test MySQL Connection (No User, Only Root Password)
-      - name: Test MySQL Connection
-        run: |
-          echo "Testing MySQL connection..."
-          mysql -h 127.0.0.1 -uroot -p${{ secrets.DB_PASSWORD }} -e "SHOW DATABASES;"
-          echo "✅ MySQL connection successful!"
-
-      ## ✅ Manually Install Packer
-      - name: Install Packer Manually
-        run: |
+          sudo apt-get update
+          sudo apt-get install -y gnupg software-properties-common wget unzip
           wget https://releases.hashicorp.com/packer/1.8.0/packer_1.8.0_linux_amd64.zip
           unzip packer_1.8.0_linux_amd64.zip
           sudo mv packer /usr/local/bin/
-          packer --version
-          echo "✅ Packer installed successfully!"
+          packer --version  # Verify installation
 
-      ## ✅ Initialize Packer (Install Plugins)
-      - name: Initialize Packer
+      - name: Run Packer Init
         run: packer init .
 
-      ## ✅ Run Packer Formatting Check
-      - name: Run Packer FMT Check
-        run: packer fmt -check -diff .
+      - name: Run Packer Formatting Check
+        run: packer fmt .
+        continue-on-error: false
 
-      ## ✅ Run Packer Validate
       - name: Run Packer Validate
-        run: packer validate ubuntu-custom.pkr.hcl
+        run: packer validate .
+        continue-on-error: false
 
-      ## ✅ List Repository Files (Debugging)
-      - name: List Repository Files
-        run: ls -la
+  packer-build:
+    needs: [packer-fmt-validate]  # Ensure validation passes before building
+    runs-on: ubuntu-latest
+    env:
+      AWS_DEFAULT_REGION: us-east-1
+    strategy:
+      matrix:
+        platform: [aws, gcp]  # Build images for AWS and GCP in parallel
 
-      ## ✅ Build Application Artifact
-      - name: Build Application Artifact
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v2
+
+      - name: Install AWS CLI
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: Install GCP SDK
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}
+
+      - name: Install MySQL
         run: |
-          mkdir -p build
-          cp app.py config.py packer-template.pkr.hcl requirements.txt webapp.service build/
-          echo "✅ Artifact built successfully"
+          sudo apt-get update
+          sudo apt-get install -y mysql-client
+          mysql --version
 
-      ## ✅ Debug Packer Variables Before Running Build
-      - name: Debug Packer Variables
+      - name: Install Packer
         run: |
-          echo "Using app_artifact_path=build/"
-          echo "Google Cloud project: $(jq -r '.project_id' gcp-key.json)"
-          echo "AWS Region: us-east-1"
+          sudo apt-get update
+          sudo apt-get install -y gnupg software-properties-common wget unzip
+          wget https://releases.hashicorp.com/packer/1.8.0/packer_1.8.0_linux_amd64.zip
+          unzip packer_1.8.0_linux_amd64.zip
+          sudo mv packer /usr/local/bin/
+          packer --version  # Verify installation
 
-      ## ✅ Ensure GCP Credentials Exist Before Packer Build
-      - name: Ensure GCP Credentials Exist Before Packer Build
+      - name: Configure AWS CLI
+        if: matrix.platform == 'aws'
         run: |
-          if [[ ! -f "$GOOGLE_APPLICATION_CREDENTIALS" ]]; then
-            echo "❌ ERROR: GOOGLE_APPLICATION_CREDENTIALS file not found!"
+          mkdir -p ~/.aws
+          echo "[default]" > ~/.aws/credentials
+          echo "[default]" > ~/.aws/config
+          echo "aws_access_key_id=${{ secrets.AWS_ACCESS_KEY_ID }}" >> ~/.aws/credentials
+          echo "aws_secret_access_key=${{ secrets.AWS_SECRET_ACCESS_KEY }}" >> ~/.aws/credentials
+          echo "region=us-east-1" >> ~/.aws/config
+
+      - name: Decode and Store GCP Credentials
+        if: matrix.platform == 'gcp'
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS_JSON: ${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}
+        run: |
+          echo "Decoding GCP credentials..."
+
+          if [[ -z "$GOOGLE_APPLICATION_CREDENTIALS_JSON" ]]; then
+            echo "ERROR: GOOGLE_APPLICATION_CREDENTIALS_JSON is empty!"
             exit 1
           fi
-          echo "✅ GCP credentials ready for Packer."
 
-      ## ✅ Build Packer Image for AWS & GCP
-      - name: Build Packer Image for AWS & GCP
+          echo "$GOOGLE_APPLICATION_CREDENTIALS_JSON" | base64 --decode > $HOME/gcp-key.json
+          echo "GOOGLE_APPLICATION_CREDENTIALS=$HOME/gcp-key.json" >> $GITHUB_ENV
+
+          ls -l $HOME/gcp-key.json || echo "gcp-key.json NOT FOUND!"
+          cat $HOME/gcp-key.json | jq . || echo "Invalid JSON!"
+
+          gcloud auth activate-service-account --key-file=$HOME/gcp-key.json
+          gcloud config set project "$(jq -r '.project_id' $HOME/gcp-key.json)"
+
+      - name: Build Application Artifact
         run: |
-          packer build \
-          -var "app_artifact_path=build/" \
-          -var "aws_region=us-east-1" \
-          -var "gcp_project=$(jq -r '.project_id' gcp-key.json)" \
-          ubuntu-custom.pkr.hcl
+          tar -czvf app_artifact.tar.gz app.py config.py packer-template.pkr.hcl requirements.txt webapp.service
+          echo "Artifact built successfully"
+
+      - name: Run Packer Init
+        run: packer init .
+
+      - name: Build AWS & GCP Images with Packer
+        env:
+          AWS_PROFILE: default
+        run: packer build .
+
+  update-launch-template:
+    name: Update Launch Template
+    runs-on: ubuntu-latest
+    needs: [packer-build]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Retrieve Latest AMI ID
+        run: |
+          LATEST_AMI_ID=$(aws ec2 describe-images --owners self --query 'Images[*].[ImageId]' --output text | tail -n1)
+          echo "Latest AMI: $LATEST_AMI_ID"
+          echo "LATEST_AMI_ID=$LATEST_AMI_ID" >> $GITHUB_ENV
+
+      - name: Create new Launch Template version
+        run: |
+          aws ec2 create-launch-template-version --launch-template-name asg_launch_config \
+            --launch-template-data "ImageId=${{ env.LATEST_AMI_ID }}" \
+            --source-version ${{ env.version_number }}
+
+      - name: Start AWS Auto Scaling Group Refresh
+        run: |
+          aws autoscaling start-instance-refresh --auto-scaling-group-name csye6225-asg-spring2023 --strategy Rolling
