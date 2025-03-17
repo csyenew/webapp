@@ -61,15 +61,15 @@ jobs:
 
       - name: Check Packer Format
         run: |
-          if ! packer fmt -check packer.pkr.hcl; then
+          if ! packer fmt -check packer/debian.pkr.hcl; then
             echo "Packer format is incorrect. Please run 'packer fmt' locally."
             exit 1
           fi
 
       - name: Validate Packer Configuration
         run: |
-          packer init packer.pkr.hcl
-          if ! packer validate packer.pkr.hcl; then
+          packer init packer/debian.pkr.hcl
+          if ! packer validate packer/debian.pkr.hcl; then
             echo "Packer configuration is not valid."
             exit 1
           fi
