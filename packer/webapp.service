@@ -1,0 +1,20 @@
+# ✅ Setup WebApp as a Systemd Service
+sudo tee /etc/systemd/system/webapp.service > /dev/null <<EOL
+[Unit]
+Description=My WebApp
+After=network.target
+
+[Service]
+User=ds
+WorkingDirectory=/home/admin/webapp
+ExecStart=/home/admin/webapp/venv/bin/python3 /home/admin/webapp/app.py
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+EOL
+
+# ✅ Reload systemd and start the service
+sudo systemctl daemon-reload
+sudo systemctl enable webapp.service
+sudo systemctl start webapp.service
