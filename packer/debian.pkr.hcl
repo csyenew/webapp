@@ -82,12 +82,12 @@ build {
   ]
 
   provisioner "file" {
-  source      = "/Users/deepashenoy/Downloads/webapp-main-2_3"
-  destination = "/home/admin/webapp"
-}
+    source      = "/Users/deepashenoy/Downloads/webapp-main-2_3"
+    destination = "/home/admin/webapp"
+  }
 
-provisioner "shell" {
-  script = "/Users/deepashenoy/Downloads/webapp-main-2_3/packer/provision.sh"
-}
+  provisioner "shell" {
+    script = "/Users/deepashenoy/Downloads/webapp-main-2_3/packer/provision.sh"
+  }
 
 }
