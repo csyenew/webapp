@@ -1,101 +1,75 @@
-name: Continuous Integration (CI)
+name: Integration test
+
+# Enable Buildkit and let compose use it to speed up image building
+env:
+  DOCKER_BUILDKIT: 1
+  COMPOSE_DOCKER_CLI_BUILD: 1
 
 on:
   pull_request:
-    branches: [main]
+    branches:
+      - main
 
-jobs: 
-  packer-fmt-validate:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
 
-      - name: Install Packer
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y gnupg software-properties-common wget unzip
-          wget https://releases.hashicorp.com/packer/1.8.0/packer_1.8.0_linux_amd64.zip
-          unzip packer_1.8.0_linux_amd64.zip
-          sudo mv packer /usr/local/bin/
-          packer --version  # Verify installation
+concurrency:
+  group: ${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
 
-      - name: Run Packer Init
-        run: packer init .
-
-      - name: Run Packer Formatting Check
-        run: packer fmt .
-        continue-on-error: false
-
-      - name: Run Packer Validate
-        run: packer validate .
-        continue-on-error: false
-  test:
+jobs:
+  pytest:
+    name: Pytest
     runs-on: ubuntu-latest
 
     services:
-      mysql:
-        image: mysql:8.0
-        env:
-          MYSQL_ROOT_PASSWORD: ds220401
-          MYSQL_DATABASE: ds
+      postgres:
+        image: postgres:15
         ports:
-          - 3306:3306
-        options: >-
-          --health-cmd="mysqladmin ping -h localhost"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=3
- 
+          - 5432:5432
+        env:
+          POSTGRES_PASSWORD: postgres
+
+    env:
+      DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/postgres"
+
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
+
+      - name: Checkout Code Repository
+        uses: actions/checkout@v3
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v3
         with:
-          python-version: "3.11"
+          python-version: "3.10"
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
 
       - name: Install Dependencies
         run: |
-          # Create virtual environment
-          python -m venv venv
-          
-          # Activate virtual environment
-          source venv/bin/activate
-          
-          # Install dependencies
+          python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install flask  # Ensure Flask is installed
 
-      - name: Wait for MySQL to be Ready
-        run: |
-          echo "Waiting for MySQL to start..."
-          for i in {1..30}; do
-            if mysqladmin ping -h 127.0.0.1 --silent; then
-              echo "MySQL is up!"
-              break
-            fi
-            echo "MySQL is unavailable - sleeping"
-            sleep 2
-          done
+      - name: Test with pytest
+        run: pytest
 
-      - name: Set Environment Variables
-        run: |
-          echo "SQLALCHEMY_DATABASE_URI=mysql+mysqlconnector://root:ds220401@127.0.0.1:3306/ds" >> $GITHUB_ENV
-
-      - name: Initialize Migrations (if not present)
-        run: |
-          source venv/bin/activate  # Ensure virtual environment is activated
-          if [ ! -d "migrations" ]; then
-            flask db init
-          fi 
-
-      - name: Run Database Migrations
-        run: |
-          source venv/bin/activate  # Ensure virtual environment is activated
-          flask db migrate -m "Initial migration" || true  # Allow failure if no changes
-          flask db upgrade
-      
-      # Skip the pytest step if you don't want automated tests
- 
+  check_format:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+    - name: Install Packer
+      run: sudo apt-get update && sudo apt-get install -y packer
+    - name: Check Packer file format
+      run: |
+        if ! packer fmt -check packer; then
+          echo "Packer format is not correct. Please run 'packer fmt' to fix the issue."
+          exit 1
+        fi
+    - name: Check Packer file valid
+      run: |
+        packer init packer
+        if ! packer validate packer; then
+          echo "Packer files are not valid."
+          exit 1
+        fi
+  
