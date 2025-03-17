@@ -1,63 +1,17 @@
-from fastapi.testclient import TestClient
-from fastapi import status
-import pytest
-import os
 import io
-from unittest.mock import patch, MagicMock
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy.pool import StaticPool
+from fastapi import status
+from models import FileRecord
 
-# Import app but patch S3 and database before app initializes
-with patch("boto3.client"):
-    from main import app
-    from database import get_db, Base
+# All fixtures are imported from conftest.py
 
-# Create in-memory SQLite database for testing
-SQLALCHEMY_DATABASE_URL = "sqlite:///:memory:"
-engine = create_engine(
-    SQLALCHEMY_DATABASE_URL,
-    connect_args={"check_same_thread": False},
-    poolclass=StaticPool,
-)
-TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
-# Create tables
-Base.metadata.create_all(bind=engine)
-
-# Override the get_db dependency
-def override_get_db():
-    try:
-        db = TestingSessionLocal()
-        yield db
-    finally:
-        db.close()
-
-app.dependency_overrides[get_db] = override_get_db
-
-# Set test environment variables
-os.environ["S3_BUCKET"] = "test-bucket"
-os.environ["AWS_REGION"] = "us-east-1"
-
-# Mock S3 client
-@pytest.fixture(autouse=True)
-def mock_s3():
-    with patch("main.s3_client") as mock_s3:
-        mock_s3.put_object.return_value = {}
-        mock_s3.delete_object.return_value = {}
-        yield mock_s3
-
-# Create test client
-client = TestClient(app)
-
-def test_health_check():
+def test_health_check(client):
     """Test the health check endpoint"""
     response = client.get('/healthz')
     assert response.status_code == status.HTTP_200_OK
     assert 'status' in response.json()
     assert response.json()['status'] == 'healthy'
 
-def test_upload_file(mock_s3):
+def test_upload_file(client, db_session, s3):
     """Test file upload endpoint"""
     # Create a test file
     test_file = io.BytesIO(b"test file content")
@@ -70,28 +24,22 @@ def test_upload_file(mock_s3):
     )
     
     # Check S3 client was called
-    mock_s3.put_object.assert_called_once()
+    s3.put_object.assert_called_once()
     
     # Check response
     assert response.status_code == status.HTTP_201_CREATED
     assert "filename" in response.json()
     assert "s3_url" in response.json()
     assert response.json()["filename"] == "test.txt"
+    
+    # Verify file record was created in database
+    file_record = db_session.query(FileRecord).first()
+    assert file_record is not None
+    assert file_record.filename == "test.txt"
 
-def test_get_file():
+def test_get_file(client, db_session):
     """Test get file endpoint"""
     # Add a file record directly to the database
-    db = TestingSessionLocal()
-    # First ensure user exists
-    from models import User, FileRecord
-    
-    # Check if user exists, add if not
-    user = db.query(User).filter(User.id == 1).first()
-    if not user:
-        user = User(id=1, username="testuser", email="test@example.com")
-        db.add(user)
-    
-    # Add file record
     file_record = FileRecord(
         id=1,
         filename="test.txt",
@@ -99,37 +47,26 @@ def test_get_file():
         s3_url="https://test-bucket.s3.amazonaws.com/profile_pics/1/test.txt",
         user_id=1
     )
-    db.add(file_record)
-    db.commit()
+    db_session.add(file_record)
+    db_session.commit()
     
     # Get the file
     response = client.get("/v1/user/1/pic/1")
-    
-    # Clean up
-    db.query(FileRecord).delete()
-    db.commit()
-    db.close()
     
     # Check response
     assert response.status_code == status.HTTP_200_OK
     assert "filename" in response.json()
     assert "s3_url" in response.json()
+    assert response.json()["filename"] == "test.txt"
 
-def test_delete_file(mock_s3):
+def test_get_file_not_found(client):
+    """Test get file that doesn't exist"""
+    response = client.get("/v1/user/1/pic/999")
+    assert response.status_code == status.HTTP_404_NOT_FOUND
+
+def test_delete_file(client, db_session, s3):
     """Test delete file endpoint"""
     # Add a file record directly to the database
-    db = TestingSessionLocal()
-    
-    # First ensure user exists
-    from models import User, FileRecord
-    
-    # Check if user exists, add if not
-    user = db.query(User).filter(User.id == 1).first()
-    if not user:
-        user = User(id=1, username="testuser", email="test@example.com")
-        db.add(user)
-    
-    # Add file record
     file_record = FileRecord(
         id=1,
         filename="test.txt",
@@ -137,17 +74,18 @@ def test_delete_file(mock_s3):
         s3_url="https://test-bucket.s3.amazonaws.com/profile_pics/1/test.txt",
         user_id=1
     )
-    db.add(file_record)
-    db.commit()
+    db_session.add(file_record)
+    db_session.commit()
     
     # Delete the file
     response = client.delete("/v1/user/1/pic/1")
     
-    # Clean up
-    db.close()
-    
     # Check S3 client was called
-    mock_s3.delete_object.assert_called_once()
+    s3.delete_object.assert_called_once()
     
     # Check response
     assert response.status_code == status.HTTP_204_NO_CONTENT
+    
+    # Verify file record was deleted from database
+    file_record = db_session.query(FileRecord).filter_by(id=1).first()
+    assert file_record is None
