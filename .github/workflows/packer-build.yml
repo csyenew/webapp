@@ -1,131 +1,44 @@
-name: Packer CI
+name: Packer Build
 
 on:
   pull_request:
     types: [closed]
     branches:
       - main
- 
 
 jobs:
-  packer-format-validate:
+  packer-build:
+    name: Packer Build
     runs-on: ubuntu-latest
+    if: github.event.pull_request.merged == true
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_DEFAULT_REGION: ${{ secrets.REGION }}
+
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
-      - name: Install Packer
+      - name: Install Packer Manually
         run: |
-          sudo apt-get update
-          sudo apt-get install -y gnupg software-properties-common wget unzip
-          wget https://releases.hashicorp.com/packer/1.8.0/packer_1.8.0_linux_amd64.zip
-          unzip packer_1.8.0_linux_amd64.zip
-          sudo mv packer /usr/local/bin/
-          packer --version  # Verify installation
+          PACKER_VERSION="1.8.0"
+          PACKER_URL="https://releases.hashicorp.com/packer/${PACKER_VERSION}/packer_${PACKER_VERSION}_linux_amd64.zip"
 
-      - name: Run Packer Init
-        run: packer init .
-
-      - name: Run Packer Formatting Check
-        run: packer fmt .
-        continue-on-error: false
-
-      - name: Run Packer Validate
-        run: packer validate .
-        continue-on-error: false
-
-  packer-build:
-    needs: [packer-format-validate]  # Ensure validation passes before building
-    runs-on: ubuntu-latest
-    env:
-      AWS_DEFAULT_REGION: us-east-1
-    strategy:
-      matrix:
-        platform: [aws, gcp]  # Build images for AWS and GCP in parallel
-
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v2
+          sudo rm -rf /usr/local/bin/packer
+          wget -q "${PACKER_URL}" -O packer.zip
+          sudo unzip -o packer.zip -d /usr/local/bin/
+          rm packer.zip
+          packer version
 
       - name: Install AWS CLI
         run: |
-          curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-          unzip awscliv2.zip
-          sudo ./aws/install --update
-          aws --version
-
-      - name: Install GCP CLI
-        run: |
           sudo apt-get update
-          sudo apt-get install -y google-cloud-cli
-          gcloud --version
+          sudo apt-get install -y awscli
 
-      - name: Install MySQL
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y mysql-client
-          mysql --version
+      - name: Initialize Packer
+        run: packer init packer/debian.pkr.hcl
 
-      - name: Install Packer
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y gnupg software-properties-common wget unzip
-          wget https://releases.hashicorp.com/packer/1.8.0/packer_1.8.0_linux_amd64.zip
-          unzip packer_1.8.0_linux_amd64.zip
-          sudo mv packer /usr/local/bin/
-          packer --version  # Verify installation
-
-      - name: Configure AWS CLI
-        if: matrix.platform == 'aws'
-        run: |
-          mkdir -p ~/.aws
-          echo "[default]" > ~/.aws/credentials
-          echo "[default]" > ~/.aws/config
-          echo "aws_access_key_id=${{ secrets.AWS_ACCESS_KEY_ID }}" >> ~/.aws/credentials
-          echo "aws_secret_access_key=${{ secrets.AWS_SECRET_ACCESS_KEY }}" >> ~/.aws/credentials
-          echo "region=us-east-1" >> ~/.aws/config
-
-      - name: Decode and Store GCP Credentials
-        if: matrix.platform == 'gcp'
-        env:
-          GOOGLE_APPLICATION_CREDENTIALS_JSON: ${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}
-        run: |
-          echo "Decoding GCP credentials..."
-
-          if [[ -z "$GOOGLE_APPLICATION_CREDENTIALS_JSON" ]]; then
-            echo "ERROR: GOOGLE_APPLICATION_CREDENTIALS_JSON is empty!"
-            exit 1
-          fi
-
-          echo "$GOOGLE_APPLICATION_CREDENTIALS_JSON" | base64 --decode > $HOME/gcp-key.json
-          echo "GOOGLE_APPLICATION_CREDENTIALS=$HOME/gcp-key.json" >> $GITHUB_ENV
-
-          ls -l $HOME/gcp-key.json || echo "gcp-key.json NOT FOUND!"
-          cat $HOME/gcp-key.json | jq . || echo "Invalid JSON!"
-
-          gcloud auth activate-service-account --key-file=$HOME/gcp-key.json
-          gcloud config set project "$(jq -r '.project_id' $HOME/gcp-key.json)"
-
-      - name: Build Application Artifact
-        run: |
-          tar -czvf app_artifact.tar.gz app.py config.py packer-template.pkr.hcl requirements.txt webapp.service
-          echo "Artifact built successfully"
-
-      - name: Run Packer Init
-        run: packer init .
-
-      - name: Build AWS Image with Packer
-        if: matrix.platform == 'aws'
-        env:
-          AWS_PROFILE: default
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        run: packer build -only=amazon-ebs.ubuntu_custom_aws .
-
-      - name: Build GCP Image with Packer
-        if: matrix.platform == 'gcp'
-        env:
-          GOOGLE_APPLICATION_CREDENTIALS: /home/runner/gcp-key.json
-        run: packer build -only=googlecompute.ubuntu_custom_gcp .
-
+      - name: Build Packer Image
+        run: packer build packer/debian.pkr.hcl
  
