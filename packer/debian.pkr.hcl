@@ -82,9 +82,9 @@ build {
   ]
 
   provisioner "file" {
-  source      = "webapp/"
-  destination = "/home/admin/webapp"
-}
+    source      = "../webapp/" # Go up one level and copy the whole webapp directory
+    destination = "/home/admin/webapp"
+  }
 
   provisioner "shell" {
     script = "packer/provision.sh"
