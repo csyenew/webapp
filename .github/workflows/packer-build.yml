@@ -43,3 +43,4 @@ jobs:
 
       - name: Build Packer Image
         run: packer build packer/debian.pkr.hcl
+ 
