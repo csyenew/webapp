@@ -1,19 +1,9 @@
-name: Integration test
-
-# Enable Buildkit and let compose use it to speed up image building
-env:
-  DOCKER_BUILDKIT: 1
-  COMPOSE_DOCKER_CLI_BUILD: 1
+name: CI Pipeline
 
 on:
   pull_request:
     branches:
       - main
-
-
-concurrency:
-  group: ${{ github.head_ref || github.run_id }}
-  cancel-in-progress: true
 
 jobs:
   pytest:
@@ -32,7 +22,6 @@ jobs:
       DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/postgres"
 
     steps:
-
       - name: Checkout Code Repository
         uses: actions/checkout@v3
 
@@ -49,27 +38,38 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Test with pytest
+      - name: Run Tests with pytest
         run: pytest
 
-  check_format:
+  check_packer_format:
+    name: Packer Format Check
     runs-on: ubuntu-latest
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v2
-    - name: Install Packer
-      run: sudo apt-get update && sudo apt-get install -y packer
-    - name: Check Packer file format
-      run: |
-        if ! packer fmt -check packer; then
-          echo "Packer format is not correct. Please run 'packer fmt' to fix the issue."
-          exit 1
-        fi
-    - name: Check Packer file valid
-      run: |
-        packer init packer
-        if ! packer validate packer; then
-          echo "Packer files are not valid."
-          exit 1
-        fi
-  
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Install Packer Manually
+        run: |
+          PACKER_VERSION="1.8.0"
+          PACKER_URL="https://releases.hashicorp.com/packer/${PACKER_VERSION}/packer_${PACKER_VERSION}_linux_amd64.zip"
+
+          sudo rm -rf /usr/local/bin/packer
+          wget -q "${PACKER_URL}" -O packer.zip
+          sudo unzip -o packer.zip -d /usr/local/bin/
+          rm packer.zip
+          packer version
+
+      - name: Check Packer Format
+        run: |
+          if ! packer fmt -check packer.pkr.hcl; then
+            echo "Packer format is incorrect. Please run 'packer fmt' locally."
+            exit 1
+          fi
+
+      - name: Validate Packer Configuration
+        run: |
+          packer init packer.pkr.hcl
+          if ! packer validate packer.pkr.hcl; then
+            echo "Packer configuration is not valid."
+            exit 1
+          fi
