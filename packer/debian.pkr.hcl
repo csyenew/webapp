@@ -95,6 +95,7 @@ build {
     destination = "/home/admin/webapp"
   }
 
+
   provisioner "file" {
     source      = "../requirements.txt"
     destination = "/home/admin/webapp/requirements.txt"
@@ -103,5 +104,6 @@ build {
   # Run the provision script
   provisioner "shell" {
     script = "./provision.sh"
+
   }
 }
