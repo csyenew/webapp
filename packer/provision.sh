@@ -35,7 +35,8 @@ source venv/bin/activate
 
 # Upgrade pip and install requirements
 pip install --upgrade pip
-pip install -r requirements.txt
+# If requirements.txt is in the webapp directory
+pip install -r /home/admin/webapp/requirements.txt
 EOF
 
 # ✅ Setup WebApp as a Systemd Service
