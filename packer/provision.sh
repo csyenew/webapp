@@ -35,8 +35,6 @@ rm -rf venv
 sudo apt-get -y install libpq-dev postgresql-server-dev-all
 
 
-
-
 # Create a fresh virtual environment
 python3 -m venv venv
 source venv/bin/activate
