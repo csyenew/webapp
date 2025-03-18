@@ -101,7 +101,7 @@ build {
   }
 
   provisioner "file" {
-    source      = "./webapp.service"
+    source      = "packer/webapp.service"
     destination = "/home/admin/webapp/webapp.service"
   }
   # Run the provision script
