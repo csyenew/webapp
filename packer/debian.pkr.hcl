@@ -98,5 +98,6 @@ build {
   # Run the provision script
   provisioner "shell" {
     script = "packer/provision.sh" # Use relative path
+
   }
 }
