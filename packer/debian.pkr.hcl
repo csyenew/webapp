@@ -95,7 +95,6 @@ build {
     destination = "/home/admin/webapp"
   }
 
-
   provisioner "file" {
     source      = "./requirements.txt"
     destination = "/home/admin/webapp/requirements.txt"
