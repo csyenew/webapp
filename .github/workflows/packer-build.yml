@@ -1,11 +1,9 @@
 name: Packer Build
-
 on:
   pull_request:
     types: [closed]
     branches:
       - main
-
 jobs:
   packer-build:
     name: Packer Build
@@ -15,31 +13,47 @@ jobs:
       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       AWS_DEFAULT_REGION: ${{ secrets.REGION }}
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
-
+        
       - name: Install Packer Manually
         run: |
           PACKER_VERSION="1.8.0"
           PACKER_URL="https://releases.hashicorp.com/packer/${PACKER_VERSION}/packer_${PACKER_VERSION}_linux_amd64.zip"
-
           sudo rm -rf /usr/local/bin/packer
           wget -q "${PACKER_URL}" -O packer.zip
           sudo unzip -o packer.zip -d /usr/local/bin/
           rm packer.zip
           packer version
-
-      - name: Install AWS CLI
+          
+      - name: Update AWS CLI
         run: |
-          curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-          unzip awscliv2.zip
-          sudo ./aws/install
+          if [ -d "/usr/local/aws-cli/v2/current" ]; then
+            # AWS CLI exists, update it
+            curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+            unzip -q awscliv2.zip
+            sudo ./aws/install --update
+          else
+            # Fresh install
+            curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+            unzip -q awscliv2.zip
+            sudo ./aws/install
+          fi
           aws --version
-
+          
       - name: Initialize Packer
         run: packer init packer/debian.pkr.hcl
-
+        
       - name: Build Packer Image
         run: packer build packer/debian.pkr.hcl
+        
+      - name: Get AMI ID
+        run: |
+          # Get the latest AMI ID for the output
+          AMI_ID=$(aws ec2 describe-images --owners self --filters "Name=name,Values=webapp-ami-*" --query 'sort_by(Images, &CreationDate)[-1].ImageId' --output text)
+          echo "Latest AMI ID: $AMI_ID"
+          echo "AMI_ID=$AMI_ID" >> $GITHUB_ENV
+          
+      - name: Output AMI ID
+        run: echo "Successfully built AMI with ID ${{ env.AMI_ID }}"
