@@ -96,12 +96,12 @@ build {
   }
 
   provisioner "file" {
-    source      = "../requirements.txt"
+    source      = "./requirements.txt"
     destination = "/home/admin/webapp/requirements.txt"
   }
 
   # Run the provision script
-provisioner "shell" {
-  script = "packer/provision.sh"
-}
+  provisioner "shell" {
+    script = "packer/provision.sh"
+  }
 }
