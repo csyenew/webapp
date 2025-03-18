@@ -100,12 +100,15 @@ build {
     destination = "/home/admin/webapp/requirements.txt"
   }
 
+
   provisioner "file" {
     source      = "packer/webapp.service"
     destination = "/home/admin/webapp/webapp.service"
   }
+
   # Run the provision script
   provisioner "shell" {
     script = "packer/provision.sh"
   }
+
 }
