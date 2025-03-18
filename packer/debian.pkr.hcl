@@ -46,6 +46,7 @@ variable "ami_name" {
   type    = string
   default = "webapp-ami"
 }
+
 variable "environment" {
   type    = string
   default = "dev"
@@ -69,7 +70,6 @@ source "amazon-ebs" "debian" {
     Environment = "${var.environment}"
   }
   vpc_id = "${var.vpc_id}"
-
   launch_block_device_mappings {
     device_name           = "/dev/xvda"
     delete_on_termination = true
@@ -81,13 +81,22 @@ build {
     "source.amazon-ebs.debian"
   ]
 
+  # First create the directory
+  provisioner "shell" {
+    inline = [
+      "sudo mkdir -p /home/admin/webapp",
+      "sudo chown -R admin:admin /home/admin/webapp"
+    ]
+  }
+
+  # Then upload files
   provisioner "file" {
-    source      = "../webapp/" # Go up one level and copy the whole webapp directory
+    source      = "../"
     destination = "/home/admin/webapp"
   }
 
+  # Run the provision script
   provisioner "shell" {
-    script = "packer/provision.sh"
+    script = "provision.sh" # Use relative path
   }
-
 }
