@@ -1,70 +1,36 @@
-name: Test and Build AMI
-
+name: Packer Build
 on:
   pull_request:
+    types: [closed]
     branches:
       - main
-    types: [opened, synchronize]
-  push:
-    branches:
-      - main
-
 jobs:
-  test:
-    name: Run Tests
+  packer-build:
+    name: Packer Build
     runs-on: ubuntu-latest
-    
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-        
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.10'
-          
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install pytest pytest-mock
-          
-      - name: Install SQLite
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y sqlite3
-          
-      - name: Run tests
-        run: |
-          pytest -v
-          
-  build-ami:
-    name: Build AMI with Packer
-    needs: test
-    runs-on: ubuntu-latest
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    
+    if: github.event.pull_request.merged == true
     env:
       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-      AWS_DEFAULT_REGION: ${{ secrets.AWS_REGION }}
-      
+      AWS_DEFAULT_REGION: ${{ secrets.REGION }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
         
-      - name: Install Packer
+      - name: Install Packer Manually
         run: |
           PACKER_VERSION="1.8.0"
           PACKER_URL="https://releases.hashicorp.com/packer/${PACKER_VERSION}/packer_${PACKER_VERSION}_linux_amd64.zip"
-          wget -q "${PACKER_URL}" -o packer.zip
+          sudo rm -rf /usr/local/bin/packer
+          wget -q "${PACKER_URL}" -O packer.zip
           sudo unzip -o packer.zip -d /usr/local/bin/
+          rm packer.zip
           packer version
           
-      - name: Update AWS CLI if needed
+      - name: Update AWS CLI
         run: |
           if [ -d "/usr/local/aws-cli/v2/current" ]; then
-            # AWS CLI already exists, update it
+            # AWS CLI exists, update it
             curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
             unzip -q awscliv2.zip
             sudo ./aws/install --update
@@ -77,15 +43,9 @@ jobs:
           aws --version
           
       - name: Initialize Packer
-        run: packer init packer
+        run: packer init packer/debian.pkr.hcl
         
-      - name: Format Packer template
-        run: packer fmt packer
-        
-      - name: Validate Packer template
-        run: packer validate packer
-        
-      - name: Build AMI
+      - name: Build Packer Image
         run: packer build packer/debian.pkr.hcl
         
       - name: Get AMI ID

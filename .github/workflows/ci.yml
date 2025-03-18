@@ -1,30 +1,38 @@
 name: CI Pipeline
-
 on:
   pull_request:
     branches:
       - main
-
 jobs:
   pytest:
     name: Pytest
     runs-on: ubuntu-latest
-
     services:
       postgres:
         image: postgres:15
         ports:
           - 5432:5432
         env:
-          POSTGRES_PASSWORD: postgres
-
+          POSTGRES_USER: csye6225
+          POSTGRES_PASSWORD: csye6225
+          POSTGRES_DB: csye6225
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     env:
-      DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/postgres"
-
+      POSTGRES_USER: csye6225
+      POSTGRES_PASSWORD: csye6225
+      POSTGRES_HOST: localhost
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: csye6225
+      AWS_REGION: us-east-1
+      S3_BUCKET: test-bucket
     steps:
       - name: Checkout Code Repository
         uses: actions/checkout@v3
-
+        
       - name: Set up Python
         uses: actions/setup-python@v3
         with:
@@ -32,14 +40,95 @@ jobs:
           cache: pip
           cache-dependency-path: |
             requirements.txt
-
+            
       - name: Install Dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+          pip install pytest-mock
+          
+      - name: Create conftest.py if it doesn't exist
+        run: |
+          if [ ! -f "conftest.py" ]; then
+            cat > conftest.py << 'EOF'
+            import pytest
+            import os
+            import sys
+            from unittest.mock import patch, MagicMock
 
+            # Add the project root to Python path
+            current_dir = os.path.dirname(os.path.abspath(__file__))
+            if current_dir not in sys.path:
+                sys.path.insert(0, current_dir)
+
+            # Mock boto3 client
+            mock_s3 = MagicMock()
+            mock_s3.put_object.return_value = {}
+            mock_s3.delete_object.return_value = {}
+
+            @pytest.fixture
+            def client():
+                """Test client fixture that connects to the test database"""
+                # Import here to avoid circular imports
+                from fastapi.testclient import TestClient
+                from main import app
+                
+                return TestClient(app)
+
+            @pytest.fixture
+            def db():
+                """Database session fixture for testing"""
+                # Import here to avoid circular imports
+                from database import SessionLocal
+                
+                # Create a fresh session for each test
+                db = SessionLocal()
+                try:
+                    yield db
+                finally:
+                    db.close()
+
+            @pytest.fixture
+            def s3_client():
+                """Mock S3 client fixture"""
+                with patch("main.s3_client", mock_s3):
+                    yield mock_s3
+            EOF
+          fi
+          
+      - name: Verify Database Connection
+        run: |
+          sudo apt-get update && sudo apt-get install -y postgresql-client
+          PGPASSWORD=csye6225 psql -h localhost -U csye6225 -d csye6225 -c "SELECT 'Connection successful';"
+          
+      - name: Initialize Database
+        run: |
+          PGPASSWORD=csye6225 psql -h localhost -U csye6225 -d csye6225 -c "
+          CREATE TABLE IF NOT EXISTS users (
+            id SERIAL PRIMARY KEY,
+            username VARCHAR NOT NULL UNIQUE,
+            email VARCHAR NOT NULL UNIQUE,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+            updated_at TIMESTAMP WITH TIME ZONE
+          );
+          
+          CREATE TABLE IF NOT EXISTS files (
+            id SERIAL PRIMARY KEY,
+            filename VARCHAR NOT NULL,
+            s3_key VARCHAR NOT NULL UNIQUE,
+            s3_url VARCHAR NOT NULL UNIQUE,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+          );
+          
+          INSERT INTO users (id, username, email) 
+          VALUES (1, 'testuser', 'test@example.com')
+          ON CONFLICT (id) DO NOTHING;
+          "
+          
       - name: Run Tests with pytest
-        run: pytest
+        run: |
+          python -m pytest -v
 
   check_packer_format:
     name: Packer Format Check
@@ -47,25 +136,24 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
-
+        
       - name: Install Packer Manually
         run: |
           PACKER_VERSION="1.8.0"
           PACKER_URL="https://releases.hashicorp.com/packer/${PACKER_VERSION}/packer_${PACKER_VERSION}_linux_amd64.zip"
-
           sudo rm -rf /usr/local/bin/packer
           wget -q "${PACKER_URL}" -O packer.zip
           sudo unzip -o packer.zip -d /usr/local/bin/
           rm packer.zip
           packer version
-
+          
       - name: Check Packer Format
         run: |
           if ! packer fmt -check packer/debian.pkr.hcl; then
             echo "Packer format is incorrect. Please run 'packer fmt' locally."
             exit 1
           fi
-
+          
       - name: Validate Packer Configuration
         run: |
           packer init packer/debian.pkr.hcl
