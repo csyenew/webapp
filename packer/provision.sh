@@ -29,8 +29,11 @@ cd /home/admin/webapp
 # Remove any existing virtual environment
 rm -rf venv  
 
+
 # Install PostgreSQL development libraries
 sudo apt-get -y install libpq-dev postgresql-server-dev-all
+
+
 # Create a fresh virtual environment
 python3 -m venv venv
 source venv/bin/activate

@@ -104,4 +104,5 @@ build {
   provisioner "shell" {
     script = "packer/provision.sh"
   }
+
 }
