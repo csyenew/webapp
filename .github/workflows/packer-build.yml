@@ -42,11 +42,19 @@ jobs:
           fi
           aws --version
           
+      - name: Debug file structure
+        run: |
+          echo "Current directory: $(pwd)"
+          ls -la
+          ls -la packer/
+          
       - name: Initialize Packer
-        run: packer init packer/debian.pkr.hcl
+        working-directory: packer
+        run: packer init debian.pkr.hcl
         
       - name: Build Packer Image
-        run: packer build packer/debian.pkr.hcl
+        working-directory: packer
+        run: packer build debian.pkr.hcl
         
       - name: Get AMI ID
         run: |

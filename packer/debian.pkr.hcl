@@ -91,39 +91,12 @@ build {
 
   # Then upload files
   provisioner "file" {
-    source      = "./"
+    source      = "../"
     destination = "/home/admin/webapp"
   }
 
-  # Run the provision commands directly
+  # Run the provision script
   provisioner "shell" {
-    inline = [
-      "#!/usr/bin/env bash",
-      "set -eo pipefail",
-      "export DEBIAN_FRONTEND=noninteractive",
-      "echo 'Updating and installing required packages...'",
-      "sudo apt-get update",
-      "sudo apt-get -y install python3 python3-pip python3-venv wget",
-      "echo 'Creating webapp user...'",
-      "if ! id -u webapp > /dev/null 2>&1; then",
-      "  sudo useradd -m -d /home/webapp webapp",
-      "fi",
-      "echo 'Installing CloudWatch Agent...'",
-      "sudo wget https://s3.amazonaws.com/amazoncloudwatch-agent/debian/amd64/latest/amazon-cloudwatch-agent.deb",
-      "sudo dpkg -i -E ./amazon-cloudwatch-agent.deb",
-      "sudo rm -f ./amazon-cloudwatch-agent.deb",
-      "echo 'Setting up Python virtual environment...'",
-      "cd /home/admin/webapp",
-      "python3 -m venv venv",
-      "source venv/bin/activate",
-      "pip install --upgrade pip",
-      "pip install -r requirements.txt",
-      "echo 'Setting up systemd service...'",
-      "sudo cp /home/admin/webapp/webapp.service /etc/systemd/system/",
-      "sudo systemctl daemon-reload",
-      "sudo systemctl enable webapp.service",
-      "sudo systemctl start webapp.service",
-      "echo 'Provisioning complete!'"
-    ]
+    script = "provision.sh"
   }
 }
