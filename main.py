@@ -1,4 +1,5 @@
-from fastapi import FastAPI, File, UploadFile, Depends, HTTPException, status
+from fastapi import FastAPI, File, UploadFile, Depends, Request, HTTPException, status
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 import boto3
 import uuid
@@ -6,9 +7,10 @@ import os
 from sqlalchemy.orm import Session
 import logging
 
-from database import get_db, engine, init_db
-from models import Base, FileRecord
+from database import get_db
+from models import FileRecord
 from schema import FileUploadSchema
+from utils import response
 
 # Configure logger
 logging.basicConfig(
@@ -18,32 +20,31 @@ logging.basicConfig(
 )
 logger = logging.getLogger("cloud")
 
-# Initialize database tables
-init_db()
+app = FastAPI()
 
-app = FastAPI(title="File Upload API")
+S3_BUCKET_NAME = os.getenv('S3_BUCKET_NAME')
+USE_PROFILE = os.getenv('USE_PROFILE', False)
 
-# Get S3 bucket name from environment variable
-S3_BUCKET = os.getenv("S3_BUCKET", "")
-AWS_REGION = os.getenv("AWS_REGION", "us-east-1")
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    dct = {}
+    for error in exc.errors():
+        dct[error["loc"][1]] = error["msg"]
 
-# Create S3 client using IAM role (no credentials needed)
-s3_client = boto3.client('s3', region_name=AWS_REGION)
+    return JSONResponse(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        content=dct,
+    )
 
-@app.get("/healthz", status_code=200)
-def health_check(db: Session = Depends(get_db)):
-    """Health check endpoint to verify database connection"""
-    try:
-        # Check database connection
-        db.execute("SELECT 1")
-        logger.info("Database is connected 200")
-        return {"status": "healthy"}
-    except Exception as e:
-        logger.error(f"Database is not connected: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Database connection error"
-        )
+@app.exception_handler(CustomException)
+async def handle_custom_exception(request, exc: CustomException):
+    return JSONResponse(
+        status_code=exc.status_code, content=exc.msg
+    )
+
+@app.get("/healthz")
+async def health_check():
+    return response(True, "Health check successful", status.HTTP_200_OK, log_level="info")
 
 @app.post("/v1/user/{user_id}/pic", response_model=FileUploadSchema, status_code=201)
 async def upload_file(

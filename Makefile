@@ -9,7 +9,7 @@ POSTGRES_PORT ?= 5432
 POSTGRES_DB ?= csye6225
 S3_BUCKET ?= test-bucket
 AWS_REGION ?= us-east-1
-SNS_TOPIC_ARN ?= arn
+DATABASE_URL?= postgresql://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@$(POSTGRES_HOST):$(POSTGRES_PORT)/$(POSTGRES_DB)
 # =============================================================================
 install:
 	( \
@@ -25,7 +25,7 @@ server:
 	$(dir $(abspath $(firstword $(MAKEFILE_LIST))))venv/bin/uvicorn main:app --reload --host 0.0.0.0 --port 8000
 test:
 	( \
-	source venv/bin//activate; \
+	source venv/bin/activate; \
 	pytest; \
 	)
 init:
