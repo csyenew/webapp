@@ -1,6 +1,7 @@
 import io
 from fastapi import status
 from models import FileRecord
+import uuid
 
 def test_health_check(client):
     """Test the health check endpoint"""
@@ -29,19 +30,26 @@ def test_upload_file(client, db, s3_client):
 
 def test_get_file(client, db):
     """Test get file endpoint"""
+    # Generate a unique ID for the file record to avoid conflicts
+    unique_id = abs(hash(str(uuid.uuid4())) % 1000000)  # Generate a positive number under 1M
+    
+    # Clear existing records first to avoid conflicts
+    db.query(FileRecord).filter(FileRecord.id == unique_id).delete()
+    db.commit()
+    
     # Add a file record to the database
     file_record = FileRecord(
-        id=1,
+        id=unique_id,
         filename="test.txt",
-        s3_key="profile_pics/1/test.txt",
-        s3_url="https://test-bucket.s3.amazonaws.com/profile_pics/1/test.txt",
+        s3_key=f"profile_pics/1/test_{unique_id}.txt",
+        s3_url=f"https://test-bucket.s3.amazonaws.com/profile_pics/1/test_{unique_id}.txt",
         user_id=1
     )
     db.add(file_record)
     db.commit()
     
     # Get the file
-    response = client.get("/v1/user/1/pic/1")
+    response = client.get(f"/v1/user/1/pic/{unique_id}")
     
     # Check response
     assert response.status_code == status.HTTP_200_OK
@@ -50,19 +58,26 @@ def test_get_file(client, db):
 
 def test_delete_file(client, db, s3_client):
     """Test delete file endpoint"""
+    # Generate a unique ID for the file record to avoid conflicts
+    unique_id = abs(hash(str(uuid.uuid4())) % 1000000)  # Generate a positive number under 1M
+    
+    # Clear existing records first to avoid conflicts
+    db.query(FileRecord).filter(FileRecord.id == unique_id).delete()
+    db.commit()
+    
     # Add a file record to the database
     file_record = FileRecord(
-        id=1,
+        id=unique_id,
         filename="test.txt",
-        s3_key="profile_pics/1/test.txt",
-        s3_url="https://test-bucket.s3.amazonaws.com/profile_pics/1/test.txt",
+        s3_key=f"profile_pics/1/test_{unique_id}.txt",
+        s3_url=f"https://test-bucket.s3.amazonaws.com/profile_pics/1/test_{unique_id}.txt",
         user_id=1
     )
     db.add(file_record)
     db.commit()
     
     # Delete the file
-    response = client.delete("/v1/user/1/pic/1")
+    response = client.delete(f"/v1/user/1/pic/{unique_id}")
     
     # Check response
     assert response.status_code == status.HTTP_204_NO_CONTENT

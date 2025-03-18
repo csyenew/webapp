@@ -52,9 +52,14 @@ jobs:
           sudo apt-get update && sudo apt-get install -y postgresql-client
           PGPASSWORD=csye6225 psql -h localhost -U csye6225 -d csye6225 -c "SELECT 'Connection successful';"
           
-      - name: Initialize Database
+      - name: Reset and Initialize Database
         run: |
           PGPASSWORD=csye6225 psql -h localhost -U csye6225 -d csye6225 -c "
+          -- Drop tables if they exist to start fresh
+          DROP TABLE IF EXISTS files;
+          DROP TABLE IF EXISTS users;
+          
+          -- Create tables
           CREATE TABLE IF NOT EXISTS users (
             id SERIAL PRIMARY KEY,
             username VARCHAR NOT NULL UNIQUE,
@@ -72,6 +77,7 @@ jobs:
             created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
           );
           
+          -- Insert test user
           INSERT INTO users (id, username, email) 
           VALUES (1, 'testuser', 'test@example.com')
           ON CONFLICT (id) DO NOTHING;
@@ -79,6 +85,7 @@ jobs:
           
       - name: Run Tests with pytest
         run: |
+          echo "Running pytest..."
           python -m pytest -v
 
   check_packer_format:
