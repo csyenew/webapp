@@ -1,12 +1,19 @@
 #!/usr/bin/env bash
-
-set -eo pipefail  # Exit on error
-
-export DEBIAN_FRONTEND=noninteractive  # Prevent interactive prompts
+set -eo pipefail # Exit on error
+export DEBIAN_FRONTEND=noninteractive # Prevent interactive prompts
 
 # ✅ Update and install required system libraries
 sudo apt-get update
-sudo apt-get -y install python3 python3-pip python3-venv wget
+sudo apt-get -y install python3 python3-pip python3-venv wget libpq-dev postgresql-server-dev-all
+
+# ✅ Create the webapp user if it doesn't exist
+if ! id -u webapp > /dev/null 2>&1; then
+  sudo useradd -m -d /home/webapp webapp
+fi
+
+# ✅ Ensure the webapp directory exists with correct permissions
+sudo mkdir -p /home/admin/webapp
+sudo chown -R admin:admin /home/admin/webapp
 
 # ✅ Create the webapp user if it doesn't exist
 if ! id -u webapp > /dev/null 2>&1; then
@@ -27,17 +34,17 @@ sudo -i -u admin bash << EOF
 cd /home/admin/webapp
 
 # Remove any existing virtual environment
-rm -rf venv  
+rm -rf venv
 
 
 # Install PostgreSQL development libraries
 sudo apt-get -y install libpq-dev postgresql-server-dev-all
 
 
+
 # Create a fresh virtual environment
 python3 -m venv venv
 source venv/bin/activate
-
 # Upgrade pip and install requirements
 pip install --upgrade pip
 # If requirements.txt is in the webapp directory
