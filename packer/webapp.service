@@ -4,8 +4,10 @@ After=network.target
 
 [Service]
 User=admin
-WorkingDirectory=/home/admin/webapp
-ExecStart=/home/admin/webapp/venv/bin/uvicorn main:app --host 0.0.0.0 --port 8000
+
+WorkingDirectory=/home/admin/webapp/webapp
+ExecStart=/home/admin/webapp/venv/bin/uvicorn webapp.main:app --host 0.0.0.0 --port 8000
+
 Restart=always
 RestartSec=5
 StartLimitInterval=0

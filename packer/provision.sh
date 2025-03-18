@@ -15,14 +15,6 @@ fi
 sudo mkdir -p /home/admin/webapp
 sudo chown -R admin:admin /home/admin/webapp
 
-# ✅ Create the webapp user if it doesn't exist
-if ! id -u webapp > /dev/null 2>&1; then
-  sudo useradd -m -d /home/webapp webapp
-fi
-
-# ✅ Ensure the webapp directory exists with correct permissions
-sudo mkdir -p /home/admin/webapp
-sudo chown -R admin:admin /home/admin/webapp
 
 # ✅ Install CloudWatch Agent
 sudo wget https://s3.amazonaws.com/amazoncloudwatch-agent/debian/amd64/latest/amazon-cloudwatch-agent.deb
@@ -37,8 +29,11 @@ cd /home/admin/webapp
 rm -rf venv
 
 
+
+
 # Install PostgreSQL development libraries
 sudo apt-get -y install libpq-dev postgresql-server-dev-all
+
 
 
 
