@@ -95,13 +95,15 @@ build {
     destination = "/home/admin/webapp"
   }
 
-provisioner "file" {
-  source      = "../requirements.txt"  # This would point to /Users/deepashenoy/Documents/ds/webapp/requirements.txt
-  destination = "/home/admin/webapp/requirements.txt"
-}
+
+  provisioner "file" {
+    source      = "../requirements.txt"
+    destination = "/home/admin/webapp/requirements.txt"
+  }
+
   # Run the provision script
   provisioner "shell" {
-    script = "packer/provision.sh" # Use relative path
+    script = "./provision.sh"
 
   }
 }
