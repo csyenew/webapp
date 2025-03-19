@@ -48,12 +48,3 @@ jobs:
       - name: Build Packer Image
         run: packer build packer/debian.pkr.hcl
         
-      - name: Get AMI ID
-        run: |
-          # Get the latest AMI ID for the output
-          AMI_ID=$(aws ec2 describe-images --owners self --filters "Name=name,Values=webapp-ami-*" --query 'sort_by(Images, &CreationDate)[-1].ImageId' --output text)
-          echo "Latest AMI ID: $AMI_ID"
-          echo "AMI_ID=$AMI_ID" >> $GITHUB_ENV
-          
-      - name: Output AMI ID
-        run: echo "Successfully built AMI with ID ${{ env.AMI_ID }}"

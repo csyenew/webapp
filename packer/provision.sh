@@ -16,11 +16,6 @@ sudo mkdir -p /home/admin/webapp
 sudo chown -R admin:admin /home/admin/webapp
 
 
-# ✅ Install CloudWatch Agent
-sudo wget https://s3.amazonaws.com/amazoncloudwatch-agent/debian/amd64/latest/amazon-cloudwatch-agent.deb
-sudo dpkg -i -E ./amazon-cloudwatch-agent.deb
-sudo rm -f ./amazon-cloudwatch-agent.deb
-
 # ✅ Install application dependencies inside a virtual environment
 sudo -i -u admin bash << EOF
 cd /home/admin/webapp
