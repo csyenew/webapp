@@ -9,7 +9,7 @@ packer {
 
 variable "ami_users" {
   type    = list(string)
-  default = ["434369415270", "610018956402"]
+  default = ["241533134224", "891612581932"]
 }
 
 variable "region" {
