@@ -2,14 +2,15 @@ SHELL := /bin/bash
 VENV_NAME=venv
 #
 .EXPORT_ALL_VARIABLES:
-POSTGRES_USER ?= csye6225
-POSTGRES_PASSWORD ?= csye6225
+POSTGRES_USER ?= webapp
+POSTGRES_PASSWORD ?= webapp
 POSTGRES_HOST ?= 127.0.0.1
 POSTGRES_PORT ?= 5432
-POSTGRES_DB ?= csye6225
-S3_BUCKET ?= test-bucket
+POSTGRES_DB ?= webapp
+S3_BUCKET ?= ds2204
+DATABASE_URL?= postgresql://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@$(POSTGRES_HOST):$(POSTGRES_PORT)/$(POSTGRES_DB)
 AWS_REGION ?= us-east-1
-SNS_TOPIC_ARN ?= arn
+USE_PROFILE ?= true
 # =============================================================================
 install:
 	( \
@@ -25,7 +26,7 @@ server:
 	$(dir $(abspath $(firstword $(MAKEFILE_LIST))))venv/bin/uvicorn main:app --reload --host 0.0.0.0 --port 8000
 test:
 	( \
-	source venv/bin//activate; \
+	source venv/bin/activate; \
 	pytest; \
 	)
 init:

@@ -2,12 +2,11 @@
 from fastapi.responses import JSONResponse, Response
 from fastapi import status as st
 
-from logging.config import dictConfig
 import logging
-from log import LogConfig
 
-dictConfig(LogConfig().dict())
-logger = logging.getLogger("cloud")
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+
+logger = logging.getLogger(__name__)
 
 
 def response(message: str, status_code: int , data=None, headers=None, log_level="error", no_content=False):

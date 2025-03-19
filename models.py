@@ -1,27 +1,28 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, DateTime
-from sqlalchemy.orm import relationship
+from sqlalchemy import Column, Integer, String, ForeignKey, Date, create_engine
+from sqlalchemy.orm import relationship, declarative_base
 from sqlalchemy.sql import func
-from database import Base
+from sqlalchemy.dialects.postgresql import UUID
+import uuid
+from database import database_connection, SQLALCHEMY_DATABASE_URL
 
-class User(Base):
-    __tablename__ = "users"
-    
-    id = Column(Integer, primary_key=True, index=True)
-    username = Column(String, unique=True, index=True)
-    email = Column(String, unique=True, index=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-    
-    files = relationship("FileRecord", back_populates="user", cascade="all, delete-orphan")
+Base = declarative_base()
 
 class FileRecord(Base):
     __tablename__ = "files"
     
-    id = Column(Integer, primary_key=True, index=True)
-    filename = Column(String, nullable=False)
-    s3_key = Column(String, nullable=False, unique=True)
-    s3_url = Column(String, nullable=False, unique=True)
-    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    
-    user = relationship("User", back_populates="files")
+    id = Column(UUID(as_uuid=True), primary_key=True, index=True, default=uuid.uuid4)
+    file_name = Column(String, nullable=False)
+    url = Column(String, nullable=True, unique=True)
+    upload_date = Column(Date, server_default=func.now())
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "file_name": self.file_name,
+            "url": self.url,
+            "upload_date": self.upload_date
+        }
+
+if database_connection():
+    engine = create_engine(SQLALCHEMY_DATABASE_URL)
+    Base.metadata.create_all(bind=engine)
