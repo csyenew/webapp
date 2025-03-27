@@ -14,14 +14,63 @@ from models import FileRecord
 from schema import FileUploadSchema, CustomException
 from utils import response
 from io import BytesIO
+import time
+import statsd
+from statsd import StatsClient
+
 
 # Configure logger
-logging.basicConfig(
-    level=logging.INFO,
-    format="[%(asctime)s] %(levelname)s [%(name)s:%(lineno)d] %(message)s",
-    datefmt="%b/%d/%Y %H:%M:%S"
-)
+# logging.basicConfig(
+#     level=logging.INFO,
+#     format="[%(asctime)s] %(levelname)s [%(name)s:%(lineno)d] %(message)s",
+#     datefmt="%b/%d/%Y %H:%M:%S"
+# )
+# logger = logging.getLogger("cloud")
+import logging.config
+
+
+LOGGING_CONFIG = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "standard": {
+            "format": "[%(asctime)s] %(levelname)s [%(name)s:%(lineno)d] %(message)s",
+            "datefmt": "%b/%d/%Y %H:%M:%S"
+        }
+    },
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": "standard",
+            "stream": "ext://sys.stderr"
+        },
+        "file": {
+            "class": "logging.handlers.RotatingFileHandler",
+            "formatter": "standard",
+            "filename": "cloudwatch.log",
+            "maxBytes": 1024 * 1025 * 50,
+            "backupCount": 10,
+            "level": "INFO"
+        }
+    },
+    "root": {
+        "handlers": ["console", "file"],
+        "level": "INFO"
+    },
+    "loggers": {
+        "cloud": {
+            "handlers": ["console", "file"],
+            "level": "INFO",
+            "propagate": False
+        }
+    }
+}
+
+logging.config.dictConfig(LOGGING_CONFIG)
 logger = logging.getLogger("cloud")
+
+statsd_client = StatsClient('localhost', 8125)
+
 app = FastAPI()
 
 S3_BUCKET_NAME = os.getenv('S3_BUCKET')
@@ -37,6 +86,23 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
         status_code=status.HTTP_400_BAD_REQUEST,
         content=dct,
     )
+
+
+# Middleware to capture metrics for each API request
+@app.middleware("http")
+async def metrics_middleware(request: Request, call_next):
+    start_time = time.time()
+    response_obj = await call_next(request)
+    duration_ms = (time.time() - start_time) * 1000  # convert to milliseconds
+
+    # Emit custom metrics
+    api_path = request.url.path.replace("/", "_")  # Convert API paths to valid metric names
+    statsd_client.incr(f"api.request.count.{api_path}")
+    statsd_client.timing(f"api.request.response_time.{api_path}", duration_ms)
+
+    logger.info(f"Request {request.method} {request.url.path} took {duration_ms:.2f}ms")
+    return response_obj
+
 
 @app.exception_handler(CustomException)
 async def handle_custom_exception(request, exc: CustomException):

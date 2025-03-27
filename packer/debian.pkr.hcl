@@ -59,29 +59,29 @@ locals {
 source "amazon-ebs" "debian" {
   profile       = "packer"
   ami_name      = "${var.ami_name}-${local.timestamp}"
-  ami_users     = "${var.ami_users}"
-  instance_type = "${var.instance_type}"
-  region        = "${var.region}"
-  source_ami    = "${var.source_ami}"
-  ssh_username  = "${var.ssh_username}"
-  subnet_id     = "${var.subnet_id}"
+  ami_users     = var.ami_users
+  instance_type = var.instance_type
+  region        = var.region
+  source_ami    = var.source_ami
+  ssh_username  = var.ssh_username
+  subnet_id     = var.subnet_id
   tags = {
     Name        = "${var.ami_name}-${local.timestamp}"
-    Environment = "${var.environment}"
+    Environment = var.environment
   }
-  vpc_id = "${var.vpc_id}"
+  vpc_id = var.vpc_id
   launch_block_device_mappings {
     device_name           = "/dev/xvda"
+    volume_size           = 30
+    volume_type           = "gp2"
     delete_on_termination = true
   }
 }
 
 build {
-  sources = [
-    "source.amazon-ebs.debian"
-  ]
+  sources = ["source.amazon-ebs.debian"]
 
-  # First create the directory
+  # Create the app directory
   provisioner "shell" {
     inline = [
       "sudo mkdir -p /home/admin/webapp",
@@ -89,7 +89,7 @@ build {
     ]
   }
 
-  # Then upload files
+  # Upload app files
   provisioner "file" {
     source      = "../"
     destination = "/home/admin/webapp"
@@ -100,15 +100,46 @@ build {
     destination = "/home/admin/webapp/requirements.txt"
   }
 
-
   provisioner "file" {
     source      = "packer/webapp.service"
     destination = "/home/admin/webapp/webapp.service"
   }
 
-  # Run the provision script
+  # Install the Unified CloudWatch Agent
+  provisioner "shell" {
+    inline = [
+      "echo Installing Unified CloudWatch Agent...",
+      "wget https://s3.amazonaws.com/amazoncloudwatch-agent/debian/amd64/latest/amazon-cloudwatch-agent.deb -O amazon-cloudwatch-agent.deb",
+      "sudo dpkg -i amazon-cloudwatch-agent.deb",
+      "rm amazon-cloudwatch-agent.deb"
+    ]
+  }
+
+  # Upload CloudWatch config to /tmp
+  provisioner "file" {
+    source      = "packer/cloudwatch-config.json"
+    destination = "/tmp/cloudwatch-config.json"
+  }
+
+  # Move CloudWatch config to correct location with sudo
+  provisioner "shell" {
+    inline = [
+      "sudo mv /tmp/cloudwatch-config.json /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json",
+      "sudo chown root:root /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json"
+    ]
+  }
+
+  # Start the CloudWatch Agent and enable it on boot
+  provisioner "shell" {
+    inline = [
+      "echo Starting CloudWatch Agent...",
+      "sudo /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 -c file:/opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json -s",
+      "sudo systemctl enable amazon-cloudwatch-agent"
+    ]
+  }
+
+  # Final provisioning script (e.g., app setup, Python deps)
   provisioner "shell" {
     script = "packer/provision.sh"
   }
-
 }
