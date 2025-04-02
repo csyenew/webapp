@@ -106,6 +106,31 @@ build {
     destination = "/home/admin/webapp/webapp.service"
   }
 
+  # 1. Install the Unified CloudWatch Agent
+  provisioner "shell" {
+    inline = [
+      "echo Installing Unified CloudWatch Agent...",
+      "wget https://s3.amazonaws.com/amazoncloudwatch-agent/debian/amd64/latest/amazon-cloudwatch-agent.deb -O amazon-cloudwatch-agent.deb",
+      "sudo dpkg -i amazon-cloudwatch-agent.deb",
+      "rm amazon-cloudwatch-agent.deb"
+    ]
+  }
+
+  # 2. Copy the CloudWatch Agent configuration file (cloudwatch-config.json)
+  provisioner "file" {
+    source      = "packer/cloudwatch-config.json"
+    destination = "/opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json"
+  }
+
+  # 3. Start the CloudWatch Agent and enable it to run on boot
+  provisioner "shell" {
+    inline = [
+      "echo Starting CloudWatch Agent...",
+      "sudo /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 -c file:/opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json -s",
+      "sudo systemctl enable amazon-cloudwatch-agent"
+    ]
+  }
+
   # Run the provision script
   provisioner "shell" {
     script = "packer/provision.sh"
