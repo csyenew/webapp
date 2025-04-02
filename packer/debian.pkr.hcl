@@ -119,15 +119,14 @@ build {
   # 2. Copy the CloudWatch Agent configuration file (cloudwatch-config.json)
   provisioner "file" {
     source      = "packer/cloudwatch-config.json"
-    destination = "/opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json"
+    destination = "/tmp/cloudwatch-config.json"
   }
 
-  # 3. Start the CloudWatch Agent and enable it to run on boot
   provisioner "shell" {
     inline = [
-      "echo Starting CloudWatch Agent...",
-      "sudo /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 -c file:/opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json -s",
-      "sudo systemctl enable amazon-cloudwatch-agent"
+      "echo Moving CloudWatch config with sudo...",
+      "sudo mv /tmp/cloudwatch-config.json /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json",
+      "sudo chown root:root /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json"
     ]
   }
 
