@@ -73,3 +73,4 @@ xxhash==3.5.0
 yarl==1.18.3
 statsd==4.0.1
 pytest==8.2.1
+fastapi==0.110.2
