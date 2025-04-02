@@ -72,6 +72,7 @@ source "amazon-ebs" "debian" {
   vpc_id = var.vpc_id
   launch_block_device_mappings {
     device_name           = "/dev/xvda"
+    volume_size           = 16
     delete_on_termination = true
   }
 }
@@ -136,9 +137,8 @@ build {
     ]
   }
 
-  # Custom provision script
+  # Custom provisioning script
   provisioner "shell" {
     script = "packer/provision.sh"
   }
 }
-
