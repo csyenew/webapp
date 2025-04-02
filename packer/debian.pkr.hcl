@@ -73,6 +73,7 @@ source "amazon-ebs" "debian" {
   launch_block_device_mappings {
     device_name           = "/dev/xvda"
     volume_size           = 16
+    volume_type           = "gp2"
     delete_on_termination = true
   }
 }
@@ -128,7 +129,7 @@ build {
     ]
   }
 
-  # Start the CloudWatch Agent and enable it to run on boot
+  # Start the CloudWatch Agent and enable it on boot
   provisioner "shell" {
     inline = [
       "echo Starting CloudWatch Agent...",
@@ -137,7 +138,7 @@ build {
     ]
   }
 
-  # Custom provisioning script
+  # Final provisioning script (e.g., app setup, Python deps)
   provisioner "shell" {
     script = "packer/provision.sh"
   }
