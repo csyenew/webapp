@@ -73,6 +73,7 @@ source "amazon-ebs" "debian" {
   launch_block_device_mappings {
     device_name           = "/dev/xvda"
     volume_size = 16 
+    volume_type           = "gp2"
     delete_on_termination = true
   }
 }
