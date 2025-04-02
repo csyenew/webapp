@@ -103,7 +103,7 @@ build {
     destination = "/home/admin/webapp/webapp.service"
   }
 
-  # Install the CloudWatch Agent
+  # Install the Unified CloudWatch Agent
   provisioner "shell" {
     inline = [
       "echo Installing Unified CloudWatch Agent...",
@@ -127,7 +127,7 @@ build {
     ]
   }
 
-  # Start CloudWatch Agent
+  # Start the CloudWatch Agent and enable it to run on boot
   provisioner "shell" {
     inline = [
       "echo Starting CloudWatch Agent...",
@@ -141,3 +141,4 @@ build {
     script = "packer/provision.sh"
   }
 }
+
