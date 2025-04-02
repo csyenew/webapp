@@ -128,11 +128,11 @@ build {
       "echo Starting CloudWatch Agent...",
       "sudo /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 -c file:/opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json -s",
       "sudo systemctl enable amazon-cloudwatch-agent"
-    ] 
+    ]
   }
- 
+
   # Run the provision script
-  provisioner "shell" {
+  provisioner "shell" { 
     script = "packer/provision.sh"
   }
 
