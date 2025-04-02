@@ -132,7 +132,7 @@ build {
   }
 
   # Run the provision script 
-  provisioner "shell" { 
+  provisioner "shell" {
     script = "packer/provision.sh"
   }
 
