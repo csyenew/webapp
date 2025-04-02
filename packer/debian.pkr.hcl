@@ -77,8 +77,8 @@ source "amazon-ebs" "debian" {
     delete_on_termination = true
   }
 }
- 
-build {
+
+build { 
   sources = ["source.amazon-ebs.debian"]
 
   # Create the app directory
