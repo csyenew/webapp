@@ -72,7 +72,9 @@ source "amazon-ebs" "debian" {
   vpc_id = var.vpc_id
   launch_block_device_mappings {
     device_name           = "/dev/xvda"
+
     volume_size           = 30
+
     volume_type           = "gp2"
     delete_on_termination = true
   }
@@ -105,7 +107,7 @@ build {
     destination = "/home/admin/webapp/webapp.service"
   }
 
-  # Install the CloudWatch Agent
+  # Install the Unified CloudWatch Agent
   provisioner "shell" {
     inline = [
       "echo Installing Unified CloudWatch Agent...",
@@ -129,7 +131,7 @@ build {
     ]
   }
 
-  # Start CloudWatch Agent
+  # Start the CloudWatch Agent and enable it on boot
   provisioner "shell" {
     inline = [
       "echo Starting CloudWatch Agent...",
@@ -138,8 +140,8 @@ build {
     ]
   }
 
-  # Custom provision script
+  # Final provisioning script (e.g., app setup, Python deps)
   provisioner "shell" {
     script = "packer/provision.sh"
   }
-}
+
