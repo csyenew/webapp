@@ -128,7 +128,7 @@ build {
       "sudo mv /tmp/cloudwatch-config.json /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json",
       "sudo chown root:root /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json"
     ]
-  }
+  } 
 
   # Run the provision script 
   provisioner "shell" {
