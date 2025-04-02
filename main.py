@@ -96,8 +96,10 @@ async def metrics_middleware(request: Request, call_next):
     duration_ms = (time.time() - start_time) * 1000  # convert to milliseconds
 
     # Emit custom metrics
-    statsd_client.incr('api.request.count')
-    statsd_client.timing('api.request.response_time', duration_ms)
+    api_path = request.url.path.replace("/", "_")  # Convert API paths to valid metric names
+    statsd_client.incr(f"api.request.count.{api_path}")
+    statsd_client.timing(f"api.request.response_time.{api_path}", duration_ms)
+
     logger.info(f"Request {request.method} {request.url.path} took {duration_ms:.2f}ms")
     return response_obj
 
