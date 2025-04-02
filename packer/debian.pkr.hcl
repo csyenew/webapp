@@ -106,7 +106,7 @@ build {
     destination = "/home/admin/webapp/webapp.service"
   }
 
-  # 1. Install the Unified CloudWatch Agent
+  # Install CloudWatch Agent
   provisioner "shell" {
     inline = [
       "echo Installing Unified CloudWatch Agent...",
@@ -116,7 +116,7 @@ build {
     ]
   }
 
-  # 2. Copy the CloudWatch Agent configuration file (cloudwatch-config.json)
+  # Upload CloudWatch config to /tmp and move it with sudo
   provisioner "file" {
     source      = "packer/cloudwatch-config.json"
     destination = "/tmp/cloudwatch-config.json"
