@@ -59,17 +59,17 @@ locals {
 source "amazon-ebs" "debian" {
   profile       = "packer"
   ami_name      = "${var.ami_name}-${local.timestamp}"
-  ami_users     = "${var.ami_users}"
-  instance_type = "${var.instance_type}"
-  region        = "${var.region}"
-  source_ami    = "${var.source_ami}"
-  ssh_username  = "${var.ssh_username}"
-  subnet_id     = "${var.subnet_id}"
+  ami_users     = var.ami_users
+  instance_type = var.instance_type
+  region        = var.region
+  source_ami    = var.source_ami
+  ssh_username  = var.ssh_username
+  subnet_id     = var.subnet_id
   tags = {
     Name        = "${var.ami_name}-${local.timestamp}"
-    Environment = "${var.environment}"
+    Environment = var.environment
   }
-  vpc_id = "${var.vpc_id}"
+  vpc_id = var.vpc_id
   launch_block_device_mappings {
     device_name           = "/dev/xvda"
     delete_on_termination = true
@@ -77,11 +77,9 @@ source "amazon-ebs" "debian" {
 }
 
 build {
-  sources = [
-    "source.amazon-ebs.debian"
-  ]
+  sources = ["source.amazon-ebs.debian"]
 
-  # First create the directory
+  # Create the app directory
   provisioner "shell" {
     inline = [
       "sudo mkdir -p /home/admin/webapp",
@@ -89,7 +87,7 @@ build {
     ]
   }
 
-  # Then upload files
+  # Upload app files
   provisioner "file" {
     source      = "../"
     destination = "/home/admin/webapp"
@@ -100,13 +98,12 @@ build {
     destination = "/home/admin/webapp/requirements.txt"
   }
 
-
   provisioner "file" {
     source      = "packer/webapp.service"
     destination = "/home/admin/webapp/webapp.service"
   }
 
-  # Install CloudWatch Agent
+  # Install the CloudWatch Agent
   provisioner "shell" {
     inline = [
       "echo Installing Unified CloudWatch Agent...",
@@ -116,23 +113,31 @@ build {
     ]
   }
 
-  # Upload CloudWatch config to /tmp and move it with sudo
+  # Upload CloudWatch config to /tmp
   provisioner "file" {
     source      = "packer/cloudwatch-config.json"
     destination = "/tmp/cloudwatch-config.json"
   }
 
+  # Move CloudWatch config to correct location with sudo
   provisioner "shell" {
     inline = [
-      "echo Moving CloudWatch config with sudo...",
       "sudo mv /tmp/cloudwatch-config.json /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json",
       "sudo chown root:root /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json"
     ]
-  } 
+  }
 
-  # Run the provision script 
+  # Start CloudWatch Agent
+  provisioner "shell" {
+    inline = [
+      "echo Starting CloudWatch Agent...",
+      "sudo /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 -c file:/opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json -s",
+      "sudo systemctl enable amazon-cloudwatch-agent"
+    ]
+  }
+
+  # Custom provision script
   provisioner "shell" {
     script = "packer/provision.sh"
   }
-
 }
