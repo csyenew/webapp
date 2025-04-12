@@ -1,0 +1,93 @@
+name: Packer Build
+on:
+  pull_request:
+    types: [closed]
+    branches:
+      - main
+jobs:
+  packer-build:
+    name: Packer Build
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.merged == true
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_DEFAULT_REGION: ${{ secrets.REGION }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        
+      - name: Install Packer Manually
+        run: |
+          PACKER_VERSION="1.8.0"
+          PACKER_URL="https://releases.hashicorp.com/packer/${PACKER_VERSION}/packer_${PACKER_VERSION}_linux_amd64.zip"
+          sudo rm -rf /usr/local/bin/packer
+          wget -q "${PACKER_URL}" -O packer.zip
+          sudo unzip -o packer.zip -d /usr/local/bin/
+          rm packer.zip
+          packer version
+            
+      - name: Update AWS CLI
+        run: |
+          if [ -d "/usr/local/aws-cli/v2/current" ]; then
+            # AWS CLI exists, update it
+            curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+            unzip -q awscliv2.zip
+            sudo ./aws/install --update
+          else
+            # Fresh install
+            curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+            unzip -q awscliv2.zip
+            sudo ./aws/install
+          fi
+          aws --version
+          
+      - name: Initialize Packer
+        run: packer init packer/debian.pkr.hcl
+        
+      - name: Build Packer Image
+        run: packer build packer/debian.pkr.hcl
+      
+  update-launch-template:
+    name: Update launch template
+    runs-on: ubuntu-latest
+    needs: packer-build
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID_DEMO }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY_DEMO }}
+      AWS_DEFAULT_REGION: ${{ secrets.REGION }}
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v2
+
+    - name: Install AWS CLI
+      run: |
+        curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+        unzip awscliv2.zip
+        sudo ./aws/install
+
+    - name: Get latest AMI ID
+      id: vars
+      run: |
+        latest_ami=$(aws ec2 describe-images --executable-users self --query 'sort_by(Images, &CreationDate)[-1].ImageId' --output text)
+        echo "Latest AMI ID: $latest_ami"
+
+        version_number=$(aws ec2 describe-launch-template-versions --launch-template-name auto_scaling_template --query 'sort_by(LaunchTemplateVersions, &VersionNumber)[-1].VersionNumber' --output text)
+        echo "Latest AMI version: $version_number"
+
+        echo "latest_ami=$latest_ami" >> $GITHUB_OUTPUT
+        echo "version_number=$version_number" >> $GITHUB_OUTPUT
+
+    - name: Create new Launch Template version
+      run: |
+        aws ec2 create-launch-template-version \
+        --launch-template-name auto_scaling_template \
+        --source-version ${{ steps.vars.outputs.version_number }} \
+        --launch-template-data "{\"ImageId\":\"${{ steps.vars.outputs.latest_ami }}\"}"
+
+     
+    - name: Autoscaling group instance refresh
+      run: |
+        aws autoscaling start-instance-refresh --auto-scaling-group-name csye6225-asg-spring2023 --strategy Rolling --desired-configuration '{"LaunchTemplate": {"LaunchTemplateName":"auto_scaling_template", "Version":"$Latest"}}'
+
+        
