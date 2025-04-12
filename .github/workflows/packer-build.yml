@@ -85,7 +85,7 @@ jobs:
         --source-version ${{ steps.vars.outputs.version_number }} \
         --launch-template-data "{\"ImageId\":\"${{ steps.vars.outputs.latest_ami }}\"}"
 
-    
+     
     - name: Autoscaling group instance refresh
       run: |
         aws autoscaling start-instance-refresh --auto-scaling-group-name csye6225-asg-spring2023 --strategy Rolling --desired-configuration '{"LaunchTemplate": {"LaunchTemplateName":"auto_scaling_template", "Version":"$Latest"}}'
