@@ -24,7 +24,7 @@ jobs:
           sudo rm -rf /usr/local/bin/packer
           wget -q "${PACKER_URL}" -O packer.zip
           sudo unzip -o packer.zip -d /usr/local/bin/
-          rm packer.zip
+          rm packer.zip 
           packer version
             
       - name: Update AWS CLI
