@@ -62,7 +62,9 @@ jobs:
 
     - name: Install AWS CLI
       run: |
-        sudo apt-get update && sudo apt-get install -y awscli
+        curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+        unzip awscliv2.zip
+        sudo ./aws/install
 
     - name: Get latest AMI ID
       id: vars
@@ -78,7 +80,11 @@ jobs:
 
     - name: Create new Launch Template version
       run: |
-        aws ec2 create-launch-template-version --launch-template-name auto_scaling_template  --launch-template-data "ImageId=${{ steps.vars.outputs.latest_ami }}" --source-version ${{ steps.vars.outputs.version_number }}
+        aws ec2 create-launch-template-version \
+        --launch-template-name auto_scaling_template \
+        --source-version ${{ steps.vars.outputs.version_number }} \
+        --launch-template-data "{\"ImageId\":\"${{ steps.vars.outputs.latest_ami }}\"}"
+
     
     - name: Autoscaling group instance refresh
       run: |
