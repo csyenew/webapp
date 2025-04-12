@@ -26,7 +26,7 @@ jobs:
           sudo unzip -o packer.zip -d /usr/local/bin/
           rm packer.zip 
           packer version
-             
+
       - name: Update AWS CLI
         run: |
           if [ -d "/usr/local/aws-cli/v2/current" ]; then
@@ -62,6 +62,7 @@ jobs:
 
     - name: Install AWS CLI
       run: |
+
         curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
         unzip awscliv2.zip
         sudo ./aws/install
@@ -80,12 +81,14 @@ jobs:
 
     - name: Create new Launch Template version
       run: |
+
         aws ec2 create-launch-template-version \
         --launch-template-name auto_scaling_template \
         --source-version ${{ steps.vars.outputs.version_number }} \
         --launch-template-data "{\"ImageId\":\"${{ steps.vars.outputs.latest_ami }}\"}"
 
      
+
     - name: Autoscaling group instance refresh
       run: |
         aws autoscaling start-instance-refresh --auto-scaling-group-name csye6225-asg-spring2023 --strategy Rolling --desired-configuration '{"LaunchTemplate": {"LaunchTemplateName":"auto_scaling_template", "Version":"$Latest"}}'
