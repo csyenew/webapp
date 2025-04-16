@@ -117,7 +117,7 @@ async def health_check():
         return response("Database is not connected", status.HTTP_503_SERVICE_UNAVAILABLE, no_content=True)
     return response("Database is connected", status.HTTP_200_OK, log_level="info", no_content=True)
 
-@app.post("/v1/file")
+@app.post("/v2/file")
 async def upload_file(file: UploadFile = File(...), db: Session = Depends(get_db)):
     """Upload a profile picture for a user"""
     try:
@@ -159,7 +159,7 @@ async def upload_file(file: UploadFile = File(...), db: Session = Depends(get_db
             detail=f"Error uploading file: {str(e)}"
         )
 
-@app.get("/v1/file/{id}")
+@app.get("/v2/file/{id}")
 def get_file(id: str, db: Session = Depends(get_db)):
     """Get file information by file ID"""
     try:
@@ -182,7 +182,7 @@ def get_file(id: str, db: Session = Depends(get_db)):
 
     return response("Image retrived Successfully", status.HTTP_200_OK, return_data, log_level="info")
 
-@app.delete("/v1/file/{id}")
+@app.delete("/v2/file/{id}")
 def delete_file(id: str, db: Session = Depends(get_db)):
     """Delete a file by ID"""
     try:
@@ -221,28 +221,28 @@ def delete_file(id: str, db: Session = Depends(get_db)):
         )
     
 # Edge cases for unsupported methods
-@app.head("/v1/file", status_code=405)
-@app.options("/v1/file", status_code=405)
-@app.patch("/v1/file", status_code=405)
-@app.put("/v1/file", status_code=405)
-@app.head("/v1/file/{id}", status_code=405)
-@app.options("/v1/file/{id}", status_code=405)
-@app.patch("/v1/file/{id}", status_code=405)
-@app.put("/v1/file/{id}", status_code=405)
-@app.post("/v1/file/{id}", status_code=405)
+@app.head("/v2/file", status_code=405)
+@app.options("/v2/file", status_code=405)
+@app.patch("/v2/file", status_code=405)
+@app.put("/v2/file", status_code=405)
+@app.head("/v2/file/{id}", status_code=405)
+@app.options("/v2/file/{id}", status_code=405)
+@app.patch("/v2/file/{id}", status_code=405)
+@app.put("/v2/file/{id}", status_code=405)
+@app.post("/v2/file/{id}", status_code=405)
 async def method_not_allowed():
     return {"detail": "Method Not Allowed"}
 
 # Handle missing parameters for GET and DELETE
-@app.get("/v1/file")
+@app.get("/v2/file")
 async def get_files():
-    """Reject GET requests to /v1/file without an ID"""
+    """Reject GET requests to /v2/file without an ID"""
     raise HTTPException(
         status_code=status.HTTP_400_BAD_REQUEST,
         detail="Bad Request: ID is required"
     )
 
-@app.delete("/v1/file")
+@app.delete("/v2/file")
 async def delete_files():
     """Reject DELETE requests to /v1/file without an ID"""
     raise HTTPException(
