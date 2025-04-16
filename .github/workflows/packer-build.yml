@@ -94,4 +94,4 @@ jobs:
       run: |
         aws autoscaling start-instance-refresh --auto-scaling-group-name csye6225-asg --strategy Rolling --desired-configuration '{"LaunchTemplate": {"LaunchTemplateName":"auto_scaling_template", "Version":"$Latest"}}'
 
-         
+          
