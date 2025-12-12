@@ -236,7 +236,7 @@ async def method_not_allowed():
 # Handle missing parameters for GET and DELETE
 @app.get("/v2/file")
 async def get_files():
-    """Reject GET requests to /v1/file without an ID"""
+    """Reject GET requests to /v2/file without an ID"""
     raise HTTPException(
         status_code=status.HTTP_400_BAD_REQUEST,
         detail="Bad Request: ID is required"
